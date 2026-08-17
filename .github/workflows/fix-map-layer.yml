@@ -12,18 +12,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Put the search sheet above Leaflet
+      - name: Put the search sheet above Leaflet and contain suggestions
         run: |
           python - <<'PY'
           from pathlib import Path
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
           s = s.replace('z-index:6;\n  }\n  .field-row{', 'z-index:1000;\n  }\n  .field-row{', 1)
-          s = s.replace('position:absolute; inset:0;\n    display:none;', 'position:absolute; inset:0;\n    display:none;', 1)
           s = s.replace('position:absolute; top:0; left:0; right:0;\n    background:transparent; border-bottom:none;\n    padding:16px;\n  }', 'position:absolute; top:0; left:0; right:0;\n    background:transparent; border-bottom:none;\n    padding:16px;\n    z-index:1100;\n  }', 1)
           s = s.replace('overflow:hidden; z-index:4;\n  }', 'overflow:hidden; z-index:1100;\n  }', 1)
-          s = s.replace('max-width:calc(100% - 32px);\n    padding:8px 11px;', 'max-width:calc(100% - 32px);\n    padding:8px 11px;', 1)
           s = s.replace('position:absolute; right:16px; top:166px; z-index:5;', 'position:absolute; right:16px; top:166px; z-index:1100;', 1)
+          old = '''  .suggestions{\n    position:absolute; top:calc(100% + 4px); left:0; right:0;\n    background:#fff; border:1px solid var(--line); border-radius:12px;\n    box-shadow:var(--shadow-lg); max-height:240px; overflow-y:auto; z-index:30; display:none;\n  }'''
+          new = '''  .suggestions{\n    position:absolute; top:calc(100% + 4px); left:0; right:0;\n    background:#fff; border:1px solid var(--line); border-radius:12px;\n    box-shadow:var(--shadow-lg); max-height:min(220px,34vh); overflow-y:auto; overflow-x:hidden;\n    overscroll-behavior:contain; -webkit-overflow-scrolling:touch; z-index:1200; display:none;\n  }'''
+          if old in s: s=s.replace(old,new,1)
+          s=s.replace('  .sugg-item{padding:10px 14px; cursor:pointer; display:flex; justify-content:space-between; gap:10px; border-bottom:1px solid #F0F1F3;}', '  .sugg-item{min-height:46px; padding:10px 14px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid #F0F1F3;}')
+          s=s.replace('  .sugg-name{font-size:13.5px; font-weight:500;}', '  .sugg-name{font-size:13.5px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}')
+          s=s.replace('  .sugg-meta{font-size:10.5px; color:#9AA3AD; font-family:\'IBM Plex Mono\',monospace; white-space:nowrap;}', '  .sugg-meta{font-size:10.5px; color:#9AA3AD; font-family:\'IBM Plex Mono\',monospace; white-space:nowrap; flex-shrink:0; max-width:38%; overflow:hidden; text-overflow:ellipsis;}')
           p.write_text(s, encoding='utf-8')
           PY
       - name: Commit fix
@@ -34,6 +38,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes needed"
           else
-            git commit -m "Fix map layering and search panel"
+            git commit -m "Improve search dropdown and island-wide search UI"
             git push
           fi
