@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>SegaMap — Trajets bus &amp; métro Maurice</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3CclipPath id='c'%3E%3Cpath d='M12 2C7.31 2 3.5 5.81 3.5 10.5C3.5 17 12 22 12 22S20.5 17 20.5 10.5C20.5 5.81 16.69 2 12 2Z'/%3E%3C/clipPath%3E%3C/defs%3E%3Cg clip-path='url(%23c)'%3E%3Crect x='0' y='2' width='24' height='5' fill='%23EA2839'/%3E%3Crect x='0' y='7' width='24' height='5' fill='%231A206D'/%3E%3Crect x='0' y='12' width='24' height='5' fill='%23FFD500'/%3E%3Crect x='0' y='17' width='24' height='5' fill='%2300A551'/%3E%3C/g%3E%3Ccircle cx='12' cy='9.5' r='3' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --ink:#15181D;
+    --ink-soft:#5B6472;
+    --bg:#F3F4F6;
+    --paper:#FFFFFF;
+    --line:#E7E9EC;
+    --red:#E24C4B;
+    --blue:#3B6FE0;
+    --navy:#15181D;
+    --shadow: 0 1px 2px rgba(15,20,30,0.05), 0 10px 28px -14px rgba(15,20,30,0.22);
+    --shadow-lg: 0 4px 10px rgba(15,20,30,0.08), 0 24px 48px -20px rgba(15,20,30,0.28);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    font-family:'Inter',system-ui,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior:none;
+  }
+  .app{
+    max-width:460px;
+    margin:0 auto;
+    height:100vh;
+    height:100dvh;
+    position:relative;
+    background:var(--paper);
+    overflow:hidden;
+    box-shadow: 0 0 60px rgba(0,0,0,0.08);
+  }
+  .screen{
+    position:absolute; inset:0;
+    display:none;
+    flex-direction:column;
+    background:var(--paper);
+  }
+  .screen.active{display:flex;}
+
+  /* ---------- Top bars ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 16px;
+    background:var(--paper);
+    border-bottom:1px solid var(--line);
+    flex-shrink:0;
+    z-index:5;
+  }
+  .topbar.floating{
+    position:absolute; top:0; left:0; right:0;
+    background:transparent; border-bottom:none;
+    padding:16px;
+  }
+  .icon-btn{
+    width:38px; height:38px;
+    border-radius:50%;
+    border:none;
+    background:var(--paper);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    box-shadow: var(--shadow);
+    color:var(--ink);
+    flex-shrink:0;
+  }
+  .icon-btn svg{width:18px;height:18px;}
+  .brand{
+    font-weight:800;
+    font-size:17px;
+    letter-spacing:-0.01em;
+    display:flex; align-items:center; gap:6px;
+  }
+
+  /* ---------- Home screen ---------- */
+  #screen-home .map-full{position:absolute; inset:0;}
+  .zoom-ctrl{
+    position:absolute; right:16px; top:74px;
+    display:flex; flex-direction:column;
+    background:var(--paper); border-radius:12px; box-shadow:var(--shadow);
+    overflow:hidden; z-index:4;
+  }
+  .zoom-ctrl button{
+    width:38px; height:38px; border:none; background:none; cursor:pointer;
+    font-size:18px; color:var(--ink); display:flex; align-items:center; justify-content:center;
+  }
+  .zoom-ctrl button:first-child{border-bottom:1px solid var(--line);}
+  .geo-status{
+    position:absolute; right:16px; top:166px; z-index:5;
+    max-width:calc(100% - 32px);
+    padding:8px 11px; border-radius:999px;
+    background:rgba(255,255,255,.96); border:1px solid var(--line);
+    box-shadow:var(--shadow); color:var(--ink-soft);
+    font-size:11px; font-weight:600; line-height:1.25;
+    display:none;
+  }
+  .geo-status.show{display:block;}
+  .map-status{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    z-index:3; background:rgba(255,255,255,.96); border:1px solid var(--line);
+    box-shadow:var(--shadow); border-radius:12px; padding:10px 13px;
+    font-size:12px; font-weight:600; color:var(--ink-soft);
+    pointer-events:none;
+  }
+  .map-status.hidden{display:none;}
+  .geo-status.ok{color:#17633A;}
+  .geo-status.error{color:#8A3B3B;}
+  .icon-btn.is-loading{opacity:.65; pointer-events:none;}
+  .field-row.geo-selected{border-color:var(--blue); background:#fff;}
+  .field-row.geo-selected .field-dot{box-shadow:0 0 0 4px rgba(59,111,224,.12);}
+  .locate-inline{
+    border:0; background:transparent; color:var(--blue); font:600 11px Inter,sans-serif;
+    cursor:pointer; padding:4px 0; white-space:nowrap;
+  }
+
+  .sheet{
+    position:absolute; left:0; right:0; bottom:0;
+    background:var(--paper);
+    border-radius:22px 22px 0 0;
+    box-shadow: var(--shadow-lg);
+    padding:18px 18px 20px;
+    z-index:6;
+  }
+  .field-row{
+    display:flex; align-items:center; gap:10px;
+    background:#F4F5F7;
+    border:1.5px solid transparent;
+    border-radius:12px;
+    padding:12px 14px;
+    margin-bottom:9px;
+    position:relative;
+  }
+  .field-row:focus-within{border-color:var(--blue); background:#fff;}
+  .field-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .field-dot.dot-red{background:var(--red);}
+  .field-dot.dot-blue{background:var(--blue);}
+  .field-row input{
+    border:none; background:none; outline:none;
+    font-family:'Inter',sans-serif; font-size:14.5px; color:var(--ink);
+    flex:1; min-width:0;
+  }
+  .field-row input::placeholder{color:#9AA3AD;}
+  .fields-wrap{position:relative;}
+  .swap-btn{
+    position:absolute; right:8px; top:50%; transform:translateY(-50%);
+    width:30px; height:30px; border-radius:50%;
+    background:var(--paper); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    z-index:2;
+  }
+  .suggestions{
+    position:absolute; top:calc(100% + 4px); left:0; right:0;
+    background:#fff; border:1px solid var(--line); border-radius:12px;
+    box-shadow:var(--shadow-lg); max-height:240px; overflow-y:auto; z-index:30; display:none;
+  }
+  .suggestions.open{display:block;}
+  .sugg-item{padding:10px 14px; cursor:pointer; display:flex; justify-content:space-between; gap:10px; border-bottom:1px solid #F0F1F3;}
+  .sugg-item:last-child{border-bottom:none;}
+  .sugg-item:hover{background:#F4F5F7;}
+  .sugg-name{font-size:13.5px; font-weight:500;}
+  .sugg-meta{font-size:10.5px; color:#9AA3AD; font-family:'IBM Plex Mono',monospace; white-space:nowrap;}
+  .tag-metro{color:var(--blue); font-weight:700;}
+  .tag-poi{color:var(--red); font-weight:700;}
+
+  .go-btn{
+    width:100%;
+    background:var(--navy); color:#fff; border:none;
+    font-family:'Inter',sans-serif; font-weight:700; font-size:15px;
+    padding:14px; border-radius:12px; cursor:pointer; margin-top:6px;
+  }
+  .go-btn:active{opacity:0.85;}
+  .sheet-footer{
+    text-align:center; margin-top:12px;
+    font-size:11px; color:#9AA3AD; line-height:1.6;
+  }
+
+  /* ---------- Overview screen ---------- */
+  .ov-title-block{padding:14px 18px 4px;}
+  .ov-title{font-size:16.5px; font-weight:700; line-height:1.35;}
+  .ov-subtitle{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
+
+  .icon-summary-row{
+    display:flex; align-items:center; gap:8px;
+    padding:14px 18px 12px;
+    overflow-x:auto;
+  }
+  .is-item{display:flex; flex-direction:column; align-items:center; gap:4px; flex-shrink:0;}
+  .is-circle{
+    width:34px; height:34px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff;
+  }
+  .is-circle svg{width:16px;height:16px;}
+  .is-value{font-size:10.5px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace;}
+  .is-arrow{color:#C7CBD1; font-size:15px; margin:0 -1px;}
+  .is-total{
+    margin-left:auto; flex-shrink:0;
+    font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:14px;
+    color:var(--ink); background:#F4F5F7; padding:8px 12px; border-radius:12px;
+    white-space:nowrap;
+  }
+
+  .map-wrap{position:relative; margin:0 18px; border-radius:16px; overflow:hidden; border:1px solid var(--line);}
+  .map-wrap .leaflet-container{height:220px;}
+  .recenter-btn{
+    position:absolute; right:10px; bottom:10px; z-index:400;
+    background:#fff; border:none; border-radius:10px; box-shadow:var(--shadow);
+    padding:8px 12px; font-size:12px; font-weight:600; color:var(--ink);
+    display:flex; align-items:center; gap:6px; cursor:pointer;
+  }
+  .recenter-btn svg{width:13px;height:13px;}
+
+  .steps-header{
+    padding:16px 18px 4px;
+    font-size:11px; color:#9AA3AD; text-transform:uppercase; letter-spacing:.06em; font-weight:700;
+  }
+  .steps-hint{padding:0 18px 8px; font-size:12px; color:var(--ink-soft);}
+
+  .steps-scroll{flex:1; overflow-y:auto; padding-bottom:24px;}
+
+  .step-card{
+    display:flex; align-items:flex-start; gap:12px;
+    margin:0 18px 10px;
+    padding:13px 14px;
+    background:#F9FAFB;
+    border-radius:14px;
+    cursor:pointer;
+    transition: background .12s ease;
+  }
+  .step-card:active{background:#EEF0F3;}
+  .step-card.pin-card{background:none; padding:6px 14px;}
+  .step-icon{
+    width:32px; height:32px; border-radius:50%; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; color:#fff;
+  }
+  .step-icon svg{width:15px;height:15px;}
+  .step-body{min-width:0; flex:1;}
+  .step-title{font-size:14px; font-weight:700; margin:0 0 2px; line-height:1.3;}
+  .step-route{font-size:12.5px; color:var(--ink-soft); margin:0 0 3px; line-height:1.4;}
+  .step-meta{font-size:11.5px; color:#9AA3AD; font-family:'IBM Plex Mono',monospace;}
+  .step-chevron{color:#C7CBD1; flex-shrink:0; margin-top:8px;}
+  .step-chevron svg{width:14px;height:14px;}
+
+  .fallback-banner{
+    margin:10px 18px 0;
+    padding:11px 13px;
+    background:#FEF3E2;
+    border:1px solid #F5DBA8;
+    border-radius:12px;
+    font-size:12px; color:#7A5A16; line-height:1.5;
+    display:flex; gap:9px; align-items:flex-start;
+  }
+  .fallback-banner svg{width:15px;height:15px;flex-shrink:0;margin-top:1px;}
+
+  /* ---------- Detail screen ---------- */
+  .detail-title-block{padding:16px 18px 2px;}
+  .detail-title{font-size:19px; font-weight:800; line-height:1.3;}
+  .detail-subtitle{font-size:13px; color:var(--ink-soft); margin-top:3px;}
+
+  .stat-row{
+    display:flex; gap:10px;
+    padding:14px 18px 6px;
+  }
+  .stat-chip{
+    display:flex; align-items:center; gap:6px;
+    background:#F4F5F7; border-radius:10px; padding:8px 11px;
+    font-size:12.5px; font-weight:600; color:var(--ink);
+  }
+  .stat-chip svg{width:14px;height:14px;color:var(--ink-soft);}
+
+  .detail-map-wrap{position:relative; margin:14px 18px; border-radius:16px; overflow:hidden; border:1px solid var(--line);}
+  .detail-map-wrap .leaflet-container{height:230px;}
+  .map-callout{
+    position:absolute; top:10px; left:10px; right:10px; z-index:400;
+    background:#fff; border-radius:12px; box-shadow:var(--shadow);
+    padding:9px 12px;
+  }
+  .map-callout .cal-label{font-size:10px; color:#9AA3AD; text-transform:uppercase; letter-spacing:.04em; font-weight:700;}
+  .map-callout .cal-name{font-size:13.5px; font-weight:700; margin-top:1px;}
+
+  .detail-instructions{padding:4px 18px 20px;}
+  .instr-text{font-size:13.5px; line-height:1.65; color:var(--ink);}
+  .lines-served{margin-top:12px;}
+  .lines-served .lbl{font-size:11.5px; color:var(--ink-soft); margin-bottom:7px;}
+  .line-chip-row{display:flex; flex-wrap:wrap; gap:7px;}
+  .line-chip-badge{
+    font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:12px;
+    border:1.5px solid var(--line); border-radius:8px; padding:4px 9px; color:var(--ink);
+  }
+
+  @media (max-width:480px){
+    .app{max-width:100%; box-shadow:none;}
+  }
+</style>
+</head>
+<body>
+<!-- Shared SVG defs: Mauritius-flag pin logo, referenced by every "brand" element -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <clipPath id="pinClip" clipPathUnits="userSpaceOnUse">
+      <path d="M12 2C7.31 2 3.5 5.81 3.5 10.5C3.5 17 12 22 12 22S20.5 17 20.5 10.5C20.5 5.81 16.69 2 12 2Z"/>
+    </clipPath>
+  </defs>
+</svg>
+<div class="app">
+
+  <!-- ============ SCREEN 1 : HOME ============ -->
+  <div class="screen active" id="screen-home">
+    <div id="home-map" class="map-full"></div>
+    <div class="topbar floating">
+      <button class="icon-btn" aria-label="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <div class="brand" style="background:#fff;padding:8px 14px;border-radius:999px;box-shadow:var(--shadow);"><svg viewBox="0 0 24 24" width="18" height="18" style="flex-shrink:0;"><g clip-path="url(#pinClip)"><rect x="0" y="2" width="24" height="5" fill="#EA2839"/><rect x="0" y="7" width="24" height="5" fill="#1A206D"/><rect x="0" y="12" width="24" height="5" fill="#FFD500"/><rect x="0" y="17" width="24" height="5" fill="#00A551"/></g><circle cx="12" cy="9.5" r="3" fill="#fff"/></svg>SegaMap</div>
+      <button class="icon-btn" id="locate-btn" aria-label="Ma position" title="Ma position" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      </button>
+    </div>
+    <div class="zoom-ctrl">
+      <button id="zoom-in" type="button" aria-label="Zoom avant">+</button>
+      <button id="zoom-out" type="button" aria-label="Zoom arrière">−</button>
+    </div>
+    <div id="geo-status" class="geo-status" role="status" aria-live="polite"></div>
+    <div id="map-status" class="map-status">Chargement de la carte…</div>
+
+    <div class="sheet">
+      <div class="fields-wrap">
+        <div class="field-row">
+          <span class="field-dot dot-red"></span>
+          <input id="origin-input" type="text" placeholder="Ma position" autocomplete="off" aria-label="Point de départ">
+          <button class="locate-inline" id="use-position-btn" type="button">Utiliser</button>
+        </div>
+        <div class="field-row">
+          <span class="field-dot dot-blue"></span>
+          <input id="dest-input" type="text" placeholder="Où allez-vous ?" autocomplete="off" aria-label="Destination">
+        </div>
+        <button class="swap-btn" id="swap-btn" title="Inverser" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4M7 4L3 8M7 4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+        </button>
+        <div class="suggestions" id="origin-sugg"></div>
+        <div class="suggestions" id="dest-sugg"></div>
+      </div>
+      <button class="go-btn" id="go-btn" type="button">GO</button>
+      <div class="sheet-footer" id="footer-stats">Réseau mauricien</div>
+    </div>
+  </div>
+
+  <!-- ============ SCREEN 2 : OVERVIEW + STEPS ============ -->
+  <div class="screen" id="screen-overview">
+    <div class="topbar">
+      <button class="icon-btn" id="back-to-home" aria-label="Retour">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand"><svg viewBox="0 0 24 24" width="18" height="18" style="flex-shrink:0;"><g clip-path="url(#pinClip)"><rect x="0" y="2" width="24" height="5" fill="#EA2839"/><rect x="0" y="7" width="24" height="5" fill="#1A206D"/><rect x="0" y="12" width="24" height="5" fill="#FFD500"/><rect x="0" y="17" width="24" height="5" fill="#00A551"/></g><circle cx="12" cy="9.5" r="3" fill="#fff"/></svg>SegaMap</div>
+      <button class="icon-btn" aria-label="Partager">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v14"/></svg>
+      </button>
+    </div>
+    <div class="steps-scroll">
+      <div class="ov-title-block">
+        <div class="ov-title" id="ov-title">Départ → Arrivée</div>
+        <div class="ov-subtitle">Aperçu de tout votre trajet</div>
+      </div>
+      <div id="fallback-banners"></div>
+      <div class="icon-summary-row" id="icon-summary-row"></div>
+      <div class="map-wrap">
+        <div id="overview-map"></div>
+        <button class="recenter-btn" id="recenter-btn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+          Recentrer
+        </button>
+      </div>
+      <div class="steps-header">Aperçu du trajet</div>
+      <div class="steps-hint">Appuie sur une étape pour voir le détail</div>
+      <div id="steps-list"></div>
+    </div>
+  </div>
+
+  <!-- ============ SCREEN 3 : STEP DETAIL ============ -->
+  <div class="screen" id="screen-detail">
+    <div class="topbar">
+      <button class="icon-btn" id="back-to-overview" aria-label="Retour">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand"><svg viewBox="0 0 24 24" width="18" height="18" style="flex-shrink:0;"><g clip-path="url(#pinClip)"><rect x="0" y="2" width="24" height="5" fill="#EA2839"/><rect x="0" y="7" width="24" height="5" fill="#1A206D"/><rect x="0" y="12" width="24" height="5" fill="#FFD500"/><rect x="0" y="17" width="24" height="5" fill="#00A551"/></g><circle cx="12" cy="9.5" r="3" fill="#fff"/></svg>SegaMap</div>
+      <button class="icon-btn" aria-label="Partager">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v14"/></svg>
+      </button>
+    </div>
+    <div class="steps-scroll">
+      <div class="detail-title-block">
+        <div class="detail-title" id="detail-title">—</div>
+        <div class="detail-subtitle" id="detail-subtitle">—</div>
+      </div>
+      <div class="stat-row" id="detail-stats"></div>
+      <div class="detail-map-wrap">
+        <div class="map-callout" id="detail-callout" style="display:none;">
+          <div class="cal-label">Arrêt le plus proche</div>
+          <div class="cal-name" id="detail-callout-name">—</div>
+        </div>
+        <div id="detail-map"></div>
+      </div>
+      <div class="detail-instructions">
+        <p class="instr-text" id="detail-instr">—</p>
+        <div class="lines-served" id="detail-lines" style="display:none;">
+          <div class="lbl">Cet arrêt est desservi par les lignes</div>
+          <div class="line-chip-row" id="detail-lines-chips"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script id="transit-data" type="application/json">
+{"busStops": [{"name": "Place Victoria Bus Terminal", "region": "Port Louis", "locality": "Port Louis", "lat": -20.162978, "lon": 57.497999, "notes": "Terminus principal - dessert Curepipe, Bagatelle, Mahebourg, Rose-Hill, Vacoas, Phoenix, Moka, etc."}, {"name": "Port Louis Victoria (Metro)", "region": "Port Louis", "locality": "Port Louis", "lat": -20.1625113, "lon": 57.4982083, "notes": "Station de metro express"}, {"name": "Immigration Square", "region": "Port Louis", "locality": "Port Louis", "lat": -20.1580962, "lon": 57.5047194, "notes": "Gare vers l'est - Belle Mare, Flacq"}, {"name": "Cite La Cure Bus Terminal", "region": "Port Louis", "locality": "Port Louis", "lat": -20.1553012, "lon": 57.5336087, "notes": ""}, {"name": "Coromandel (tram/bus)", "region": "Port Louis", "locality": "Coromandel", "lat": -20.1837264, "lon": 57.4693914, "notes": "Correspondance tram/bus"}, {"name": "Mauritius Bus Transport Ltd", "region": "Port Louis", "locality": "Long Mountain", "lat": -20.1497705, "lon": 57.5736805, "notes": "Siege operateur MBT"}, {"name": "United Bus Service Ltd", "region": "Port Louis", "locality": "Port Louis", "lat": -20.1704032, "lon": 57.4813378, "notes": "Siege operateur UBS"}, {"name": "Bus stop A.R. Mohamed St", "region": "Port Louis", "locality": "Port Louis", "lat": -20.1560289, "lon": 57.5171634, "notes": ""}, {"name": "Bus Stop Les Guibies", "region": "Port Louis", "locality": "Les Guibies", "lat": -20.1861127, "lon": 57.4820242, "notes": ""}, {"name": "Terre Rouge (bus stop)", "region": "Port Louis", "locality": "Terre Rouge", "lat": -20.1396061, "lon": 57.525503, "notes": "Bien desservi par transport public"}, {"name": "Bus stop Terre Rouge (Winners)", "region": "Port Louis", "locality": "Terre Rouge", "lat": -20.1312592, "lon": 57.5293306, "notes": ""}, {"name": "Bus stop A1 Terre Rouge", "region": "Port Louis", "locality": "Terre Rouge", "lat": -20.1291655, "lon": 57.5306006, "notes": ""}, {"name": "Riche Terre Bus Terminal", "region": "Port Louis", "locality": "Riche Terre", "lat": -20.1299008, "lon": 57.5231939, "notes": ""}, {"name": "Bus Stop R Terre", "region": "Port Louis", "locality": "Terre Rouge", "lat": -20.1332668, "lon": 57.5187476, "notes": ""}, {"name": "Pic Pic Bus Terminus", "region": "Ouest", "locality": "Pointe aux Sables", "lat": -20.1815399, "lon": 57.4365208, "notes": "Ouvert 5h-19h30 (13h dim)"}, {"name": "Pic Pic Bus Stop 4", "region": "Ouest", "locality": "Pointe aux Sables", "lat": -20.1786435, "lon": 57.4380577, "notes": ""}, {"name": "Pic Pic Bus Stop 1", "region": "Ouest", "locality": "Pointe aux Sables", "lat": -20.1808716, "lon": 57.436754, "notes": ""}, {"name": "La Pointe Bus Stop", "region": "Ouest", "locality": "Pointe aux Sables", "lat": -20.1753832, "lon": 57.4380362, "notes": ""}, {"name": "Bus Terminus Albion", "region": "Ouest", "locality": "Albion", "lat": -20.1988608, "lon": 57.4044952, "notes": ""}, {"name": "Albion Beach Traffic Center", "region": "Ouest", "locality": "Albion", "lat": -20.21048, "lon": 57.4041706, "notes": "Lignes 45A (Rose Hill via Morc Chazal), 52A (Port Louis via Petite Riviere)"}, {"name": "Albion Terminus Bus", "region": "Ouest", "locality": "Albion", "lat": -20.1987828, "lon": 57.4045337, "notes": ""}, {"name": "Bus Stop Albion (QCV6)", "region": "Ouest", "locality": "Albion", "lat": -20.2062793, "lon": 57.4135396, "notes": ""}, {"name": "Bambous Bus Terminal", "region": "Ouest", "locality": "Bambous", "lat": -20.2633455, "lon": 57.4098505, "notes": ""}, {"name": "Bus stop Bambous (Royal Rd)", "region": "Ouest", "locality": "Bambous", "lat": -20.2618725, "lon": 57.4146531, "notes": ""}, {"name": "Flic en Flac Bus Terminus", "region": "Ouest", "locality": "Flic en Flac", "lat": -20.306744, "lon": 57.3672534, "notes": "Lignes 123 (Port Louis), 57 (Quatre Bornes), 179 (Curepipe), 189 (Rose Hill)"}, {"name": "Wolmar Traffic Centre", "region": "Ouest", "locality": "Flic en Flac / Wolmar", "lat": -20.3067704, "lon": 57.367065, "notes": ""}, {"name": "Bus stop Flic en Flac (nord)", "region": "Ouest", "locality": "Flic en Flac", "lat": -20.2784871, "lon": 57.368769, "notes": ""}, {"name": "Bus stop Flic en Flac (sud, vue lagon)", "region": "Ouest", "locality": "Flic en Flac", "lat": -20.2850787, "lon": 57.3642816, "notes": ""}, {"name": "Bus stop Flic en Flac (Coastal Rd)", "region": "Ouest", "locality": "Flic en Flac", "lat": -20.2756128, "lon": 57.3706112, "notes": ""}, {"name": "Casela Bus Stop", "region": "Ouest", "locality": "Cascavelle / Casela", "lat": -20.2885656, "lon": 57.4027729, "notes": "Arret pour Casela World of Adventures"}, {"name": "Cascavelle Bus Terminal", "region": "Ouest", "locality": "Cascavelle", "lat": -20.2885546, "lon": 57.4043101, "notes": ""}, {"name": "Bus Stop African Safari", "region": "Ouest", "locality": "Cascavelle", "lat": -20.3032021, "lon": 57.4071874, "notes": ""}, {"name": "Beaux Songes Bus Terminal", "region": "Ouest", "locality": "Cascavelle", "lat": -20.2816029, "lon": 57.4236777, "notes": ""}, {"name": "Gare bus Cascavelle", "region": "Ouest", "locality": "Cascavelle", "lat": -20.2790859, "lon": 57.4035733, "notes": ""}, {"name": "Bus stop Cascavelle (multi-lignes)", "region": "Ouest", "locality": "Cascavelle", "lat": -20.2774887, "lon": 57.4033334, "notes": "Port Louis (120,123), Flic en Flac (57,123,179), Baie du Cap (5,120), Chamarel (243), Quatre Bornes (5,57,243), Tamarin (5,120,243), Curepipe (179)"}, {"name": "Bus stop Tamarin (nord)", "region": "Ouest", "locality": "Tamarin", "lat": -20.328947, "lon": 57.3766224, "notes": ""}, {"name": "Bus stop Tamarin (sud)", "region": "Ouest", "locality": "Tamarin", "lat": -20.3328213, "lon": 57.368174, "notes": ""}, {"name": "Bus stop Riviere Noire (nord)", "region": "Ouest", "locality": "Riviere Noire / Black River", "lat": -20.3363747, "lon": 57.3657212, "notes": ""}, {"name": "Bus stop Kaz a Pain", "region": "Ouest", "locality": "Riviere Noire / Black River", "lat": -20.3483637, "lon": 57.3643133, "notes": ""}, {"name": "Bus stop Riviere Noire (centre)", "region": "Ouest", "locality": "Riviere Noire / Black River", "lat": -20.35526, "lon": 57.366297, "notes": ""}, {"name": "Bus stop Riviere Noire (sud)", "region": "Ouest", "locality": "Riviere Noire / Black River", "lat": -20.3639011, "lon": 57.3791242, "notes": ""}, {"name": "Dinarobin Bus Stop", "region": "Ouest", "locality": "Riviere Noire District", "lat": -20.4498185, "lon": 57.3160601, "notes": "Service tres irregulier / rare"}, {"name": "Bus stop Case Noyale (nord)", "region": "Ouest", "locality": "Case Noyale", "lat": -20.3896017, "lon": 57.3819613, "notes": ""}, {"name": "Bus stop Case Noyale (sud)", "region": "Ouest", "locality": "Case Noyale", "lat": -20.4132601, "lon": 57.3694267, "notes": ""}, {"name": "Bus stop La Gaulette (nord)", "region": "Ouest", "locality": "La Gaulette", "lat": -20.4228962, "lon": 57.3640133, "notes": "Ligne 5 vers Quatre Bornes, origine Baie du Cap"}, {"name": "Bus stop La Gaulette (centre)", "region": "Ouest", "locality": "La Gaulette", "lat": -20.4271498, "lon": 57.3603319, "notes": ""}, {"name": "Bus stop La Gaulette (sud)", "region": "Ouest", "locality": "La Gaulette", "lat": -20.436663, "lon": 57.3541209, "notes": ""}, {"name": "Bus stop Le Morne", "region": "Ouest", "locality": "Le Morne", "lat": -20.4480136, "lon": 57.3468488, "notes": ""}, {"name": "Bus 243 Last Stop (Chamarel)", "region": "Ouest", "locality": "Chamarel", "lat": -20.4354993, "lon": 57.391466, "notes": "Terminus ligne 243, ouvert 6h-17h"}, {"name": "Choisy/Baie du Cap Bus Station", "region": "Ouest", "locality": "Baie du Cap", "lat": -20.4931598, "lon": 57.3794242, "notes": "Ouvert 6h-18h, vue panoramique"}, {"name": "Bus stop Grande Riviere Noire", "region": "Ouest", "locality": "Grande Riviere Noire", "lat": -20.3620569, "lon": 57.3737723, "notes": ""}, {"name": "Jan Palach Square - Bus Station", "region": "Centre", "locality": "Curepipe", "lat": -20.3167452, "lon": 57.5257668, "notes": "Ligne 143/143A: Port Louis - Reduit - Phoenix - Vacoas - Bord Cascade"}, {"name": "Jan Palach Sud - Bus Station", "region": "Centre", "locality": "Curepipe", "lat": -20.3173306, "lon": 57.5267018, "notes": ""}, {"name": "Garage CNT (Forest Side)", "region": "Centre", "locality": "Curepipe / Forest Side", "lat": -20.336399, "lon": 57.5400071, "notes": "Depot CNT"}, {"name": "Rose Hill Bus Station", "region": "Centre", "locality": "Rose Hill", "lat": -20.2419933, "lon": 57.4757293, "notes": "Correspondance metro express, ouvert 24h/24"}, {"name": "Bus Terminal Rose Hill (Busy Section)", "region": "Centre", "locality": "Rose Hill", "lat": -20.2450951, "lon": 57.4760736, "notes": "Un des plus grands arrets de l'ile"}, {"name": "Edward VII Bus Station", "region": "Centre", "locality": "Rose Hill", "lat": -20.2444575, "lon": 57.4750791, "notes": ""}, {"name": "Place Jean Cardinal Margeot Bus Station", "region": "Centre", "locality": "Rose Hill", "lat": -20.2419339, "lon": 57.4758968, "notes": ""}, {"name": "Quatre Bornes Bus Station", "region": "Centre", "locality": "Quatre Bornes", "lat": -20.2654477, "lon": 57.4784018, "notes": "Vers Port Louis, Curepipe, Vacoas, Flic en Flac"}, {"name": "Quatre Bornes Central (tram)", "region": "Centre", "locality": "Quatre Bornes", "lat": -20.265139, "lon": 57.478371, "notes": "Station tram/metro, marche centrale a cote"}, {"name": "Jean Louis Louvet Bus Station", "region": "Centre", "locality": "Quatre Bornes", "lat": -20.2672965, "lon": 57.4675432, "notes": ""}, {"name": "Trianon Bus Stop", "region": "Centre", "locality": "Quatre Bornes", "lat": -20.2598067, "lon": 57.4896151, "notes": ""}, {"name": "Trianon Bus Stop (M2)", "region": "Centre", "locality": "Quatre Bornes", "lat": -20.2611604, "lon": 57.4899477, "notes": ""}, {"name": "Bus Stop Orange Tower", "region": "Centre", "locality": "Quatre Bornes / Ebene", "lat": -20.2432412, "lon": 57.4908221, "notes": ""}, {"name": "Ebene Tower Bus Stop", "region": "Centre", "locality": "Ebene", "lat": -20.245566, "lon": 57.4905619, "notes": ""}, {"name": "Vacoas Bus Station", "region": "Centre", "locality": "Vacoas", "lat": -20.295157, "lon": 57.4930479, "notes": ""}, {"name": "La Gare Phoenix Bus Stop", "region": "Centre", "locality": "Phoenix", "lat": -20.2839836, "lon": 57.4980855, "notes": ""}, {"name": "Phoenix Bus Stop (A10)", "region": "Centre", "locality": "Phoenix", "lat": -20.2835786, "lon": 57.5048661, "notes": ""}, {"name": "Chemin Belle Terre Bus Stop", "region": "Centre", "locality": "Vacoas-Phoenix", "lat": -20.2738292, "lon": 57.5171345, "notes": ""}, {"name": "Belle Rive Bus Stop", "region": "Centre", "locality": "Vacoas-Phoenix", "lat": -20.284527, "lon": 57.5488865, "notes": ""}, {"name": "Reduit Bus Station", "region": "Centre", "locality": "Moka / Reduit", "lat": -20.2323123, "lon": 57.4987509, "notes": "Correspondance metro, point central"}, {"name": "Bagatelle Bus Stop", "region": "Centre", "locality": "Moka / Bagatelle", "lat": -20.2241773, "lon": 57.4938127, "notes": "Pres du Bagatelle Mall"}, {"name": "Bus stop Av. d'Helvetia", "region": "Centre", "locality": "Moka", "lat": -20.223774, "lon": 57.5222569, "notes": ""}, {"name": "Bus Stop Moka (QGC3)", "region": "Centre", "locality": "Moka", "lat": -20.229932, "lon": 57.5034386, "notes": ""}, {"name": "St. Pierre Traffic Centre", "region": "Centre", "locality": "St Pierre", "lat": -20.2252376, "lon": 57.5403609, "notes": "Traffic ouest-est, quelques lignes nord-est/sud"}, {"name": "Creve Coeur Bus Stop", "region": "Centre", "locality": "Creve Coeur", "lat": -20.182805, "lon": 57.5652373, "notes": ""}, {"name": "Creve Coeur Bus Station (Terminus)", "region": "Centre", "locality": "Creve Coeur", "lat": -20.1909258, "lon": 57.5659857, "notes": "Vers Port Louis, vue sur Pieter Both"}, {"name": "Upper Dagotiere Sub Hall Bus Stop", "region": "Centre", "locality": "Dagotiere", "lat": -20.2426297, "lon": 57.5660071, "notes": ""}, {"name": "NHDC Bus Stop", "region": "Centre", "locality": "Dagotiere", "lat": -20.2435133, "lon": 57.5698078, "notes": ""}, {"name": "Triolet Bus Service Ltd Terminus", "region": "Nord", "locality": "Triolet", "lat": -20.0431714, "lon": 57.5521261, "notes": "Dessert Grand Baie, Trou aux Biches, Pointe aux Piments"}, {"name": "Triolet Bus Service Garage", "region": "Nord", "locality": "Triolet", "lat": -20.0614499, "lon": 57.5498261, "notes": ""}, {"name": "Bus stop Trou-aux-Biches (XHG5)", "region": "Nord", "locality": "Trou aux Biches", "lat": -20.0229607, "lon": 57.5580198, "notes": ""}, {"name": "Terminus Trou Aux Biches", "region": "Nord", "locality": "Trou aux Biches", "lat": -20.0481708, "lon": 57.5265437, "notes": "Rond-point sur la plage"}, {"name": "Bus stop Trou-aux-Biches (XHP5)", "region": "Nord", "locality": "Trou aux Biches", "lat": -20.0143702, "lon": 57.5577699, "notes": ""}, {"name": "Bus stop Trou-aux-Biches (XG7W)", "region": "Nord", "locality": "Trou aux Biches", "lat": -20.0376178, "lon": 57.5472866, "notes": ""}, {"name": "Bus stop Royal Road Trou aux Biches", "region": "Nord", "locality": "Trou aux Biches", "lat": -20.0400551, "lon": 57.5489174, "notes": ""}, {"name": "SSRN Hospital Bus Stand", "region": "Nord", "locality": "Pamplemousses", "lat": -20.0949256, "lon": 57.559469, "notes": "Lignes: 63 Roches Noires, 117 Congomah, 175 Creve Coeur, 82 St Antoine, 84/85 Riviere du Rempart, 171 Pte aux Piments, 75 Triolet, 21 Goodlands, 22 Grand Gaube"}, {"name": "Bus stop Powder Mill Rd", "region": "Nord", "locality": "Pamplemousses", "lat": -20.1071878, "lon": 57.5761642, "notes": ""}, {"name": "Botanical Garden Bus Stop", "region": "Nord", "locality": "Pamplemousses", "lat": -20.1022667, "lon": 57.5826433, "notes": "Jardin botanique de Pamplemousses"}, {"name": "Bus Stop Boundary Rd", "region": "Nord", "locality": "Pamplemousses", "lat": -20.110915, "lon": 57.5726449, "notes": ""}, {"name": "Bus Stop Mahogany", "region": "Nord", "locality": "Pamplemousses", "lat": -20.1003063, "lon": 57.578533, "notes": ""}, {"name": "Goodlands Bus Station", "region": "Nord", "locality": "Goodlands", "lat": -20.0423399, "lon": 57.6535564, "notes": ""}, {"name": "Bus station Goodlands (XJ7W)", "region": "Nord", "locality": "Goodlands", "lat": -20.03635, "lon": 57.647228, "notes": ""}, {"name": "Bus station Goodlands Bypass", "region": "Nord", "locality": "Goodlands", "lat": -20.0515357, "lon": 57.6624052, "notes": ""}, {"name": "New Bus Station Goodlands", "region": "Nord", "locality": "Goodlands", "lat": -20.051258, "lon": 57.6621612, "notes": ""}, {"name": "Cap Malheureux Bus Station (Pavillon)", "region": "Nord", "locality": "Cap Malheureux", "lat": -19.9933901, "lon": 57.6143274, "notes": ""}, {"name": "Bus stop Cap Malheureux (2H6W)", "region": "Nord", "locality": "Cap Malheureux", "lat": -19.9879657, "lon": 57.596646, "notes": ""}, {"name": "Bus stop Cap Malheureux (2J87)", "region": "Nord", "locality": "Cap Malheureux", "lat": -19.9835234, "lon": 57.6119382, "notes": ""}, {"name": "Bus stop Cap Malheureux (2J79)", "region": "Nord", "locality": "Cap Malheureux", "lat": -19.9877253, "lon": 57.6198015, "notes": ""}, {"name": "Bain Boeuf Bus Stop", "region": "Nord", "locality": "Cap Malheureux", "lat": -19.9858184, "lon": 57.6069205, "notes": ""}, {"name": "Bus stop Cap Malheureux (2J74)", "region": "Nord", "locality": "Cap Malheureux", "lat": -19.9852891, "lon": 57.6073403, "notes": ""}, {"name": "Notre-Dame Auxiliatrice Bus Stop", "region": "Nord", "locality": "Cap Malheureux", "lat": -19.9867741, "lon": 57.6220817, "notes": ""}, {"name": "Bus stop Grand Baie MCB", "region": "Nord", "locality": "Grand Baie", "lat": -20.0124037, "lon": 57.5846327, "notes": "Centrale, frequence elevee, pas d'horaire affiche"}, {"name": "Bus Station Pereybere (Royal Rd)", "region": "Nord", "locality": "Grand Baie / Pereybere", "lat": -19.9949008, "lon": 57.5912148, "notes": ""}, {"name": "Bus Stop Coastal Road Grand Baie", "region": "Nord", "locality": "Grand Baie", "lat": -20.0047536, "lon": 57.5813929, "notes": ""}, {"name": "Express Port Louis Bus Stand (Grand Baie)", "region": "Nord", "locality": "Grand Baie", "lat": -20.0110724, "lon": 57.5844852, "notes": "Ligne 215 express - Rs44 (non-clim) / Rs48 (clim)"}, {"name": "Bus stop Grand Baie (2H5V FFW)", "region": "Nord", "locality": "Grand Baie", "lat": -19.9912635, "lon": 57.5936983, "notes": ""}, {"name": "Bus stop Public Beach Grand Baie", "region": "Nord", "locality": "Grand Baie", "lat": -20.0105494, "lon": 57.5840728, "notes": "Ligne 82 vers Pereybere"}, {"name": "Bus stop Villa Marise", "region": "Nord", "locality": "Grand Baie", "lat": -19.9978117, "lon": 57.5854035, "notes": ""}, {"name": "Pereybere (1st Public Beach) Bus Stop", "region": "Nord", "locality": "Pereybere", "lat": -19.9946346, "lon": 57.591303, "notes": ""}, {"name": "Arret de bus Residence les Cygnes", "region": "Nord", "locality": "Grand Baie", "lat": -19.9997222, "lon": 57.5866111, "notes": ""}, {"name": "Arret de bus Grand Baie (centre)", "region": "Nord", "locality": "Grand Baie", "lat": -19.9911713, "lon": 57.5937894, "notes": ""}, {"name": "Bus stop Grand Gaube", "region": "Nord", "locality": "Grand Gaube", "lat": -20.0168553, "lon": 57.6596132, "notes": ""}, {"name": "Bus Stop Sans Souci Rouillard", "region": "Nord", "locality": "Sans Souci", "lat": -19.9914697, "lon": 57.6319173, "notes": "Vers Port Louis et Grand Baie"}, {"name": "Riviere Du Rempart Bus Terminal", "region": "Nord", "locality": "Riviere du Rempart", "lat": -20.1043849, "lon": 57.6992512, "notes": ""}, {"name": "Bus stop Poudre d'Or", "region": "Nord", "locality": "Poudre d'Or", "lat": -20.0640396, "lon": 57.6812609, "notes": ""}, {"name": "Flacq Bus Station", "region": "Est", "locality": "Central Flacq", "lat": -20.1901179, "lon": 57.7252181, "notes": "Connexions vers presque toutes les directions"}, {"name": "Roches Noires (localite)", "region": "Est", "locality": "Roches Noires", "lat": -20.1112995, "lon": 57.7183691, "notes": ""}, {"name": "Neel Transport (Roches Noires)", "region": "Est", "locality": "Roches Noires", "lat": -20.1140274, "lon": 57.7201067, "notes": "Operateur local"}, {"name": "La Place Taxi GRSE/Q.Soeur", "region": "Est", "locality": "Bel Air / GRSE", "lat": -20.2559552, "lon": 57.7568773, "notes": "Point de correspondance taxi/bus"}, {"name": "Mahebourg Bus Terminal", "region": "Sud", "locality": "Mahebourg", "lat": -20.4065906, "lon": 57.7089151, "notes": "Terminus regional, pas de transport public apres 18h"}, {"name": "Souillac Bus Terminal", "region": "Sud", "locality": "Souillac", "lat": -20.5193874, "lon": 57.5226271, "notes": ""}, {"name": "CNT Bus Depot Souillac", "region": "Sud", "locality": "Souillac", "lat": -20.5192867, "lon": 57.5247055, "notes": ""}, {"name": "Riviere Des Gallets Bus Station", "region": "Sud", "locality": "Riviere des Galets", "lat": -20.5036308, "lon": 57.4565388, "notes": ""}, {"name": "Riviere Des Galets bus station (2)", "region": "Sud", "locality": "Riviere des Galets", "lat": -20.503885, "lon": 57.456601, "notes": ""}, {"name": "Rose Belle Bus Terminal", "region": "Sud", "locality": "Rose Belle", "lat": -20.4036803, "lon": 57.596249, "notes": ""}, {"name": "Bus Stop Mare-Tabac & Riviere Du Poste", "region": "Sud", "locality": "Riviere du Poste", "lat": -20.4297475, "lon": 57.5657845, "notes": "Correspondance Souillac / Mahebourg"}, {"name": "Bus Stop Souillac/Riv. des Anguilles", "region": "Sud", "locality": "Britannia", "lat": -20.4486479, "lon": 57.56697, "notes": ""}, {"name": "Bus stop Chemin Grenier (FFX6)", "region": "Sud", "locality": "Chemin Grenier", "lat": -20.5004982, "lon": 57.4615012, "notes": ""}, {"name": "Bus stop Souillac/Chamouny/Ch.Grenier", "region": "Sud", "locality": "St Aubin", "lat": -20.4971389, "lon": 57.5496101, "notes": ""}, {"name": "Bus Stop to Curepipe (Riv. des Anguilles) 1", "region": "Sud", "locality": "Riviere des Anguilles", "lat": -20.4793309, "lon": 57.558108, "notes": ""}, {"name": "Bus Stop to Curepipe (Riv. des Anguilles) 2", "region": "Sud", "locality": "Riviere des Anguilles", "lat": -20.4745592, "lon": 57.5588831, "notes": ""}, {"name": "Bus Stop to Souillac (Riv. des Anguilles) 1", "region": "Sud", "locality": "Riviere des Anguilles", "lat": -20.4739059, "lon": 57.5592989, "notes": ""}, {"name": "Bus Stop to Souillac (Riv. des Anguilles) 2", "region": "Sud", "locality": "Riviere des Anguilles", "lat": -20.4834717, "lon": 57.5575501, "notes": ""}, {"name": "Candos (Victoria Hospital)", "region": "Centre", "locality": "Quatre Bornes / Vacoas", "lat": -20.2783248, "lon": 57.4765156, "notes": "Hopital regional, carrefour majeur de nombreuses lignes NLTA"}, {"name": "Quartier-Militaire Bus Station", "region": "Est", "locality": "Quartier Militaire", "lat": -20.2475575, "lon": 57.5996207, "notes": "Correspondance vers Curepipe, Rose Hill, Port Louis, Riviere du Rempart, Centre de Flacq"}, {"name": "Vallijee Bus Station", "region": "Port Louis", "locality": "Cite Vallijee", "lat": -20.1693826, "lon": 57.4819557, "notes": "Lignes 33A, 33B, 115A, 148, 152, 160A, 234, 251, 253"}, {"name": "Plaine Verte Bus Stop", "region": "Port Louis", "locality": "Plaine Verte", "lat": -20.157765, "lon": 57.5113571, "notes": ""}, {"name": "Hermitage Bus Station", "region": "Centre", "locality": "Vacoas-Phoenix", "lat": -20.2746821, "lon": 57.5393218, "notes": ""}, {"name": "Helvetia (Les Promenades)", "region": "Centre", "locality": "Helvetia, Moka", "lat": -20.2285378, "lon": 57.5259803, "notes": "Point de repere pour l'arret Helvetia des lignes NLTA"}, {"name": "Nouvelle France (bus stop)", "region": "Sud", "locality": "Nouvelle France", "lat": -20.3852723, "lon": 57.5653017, "notes": "Sur l'axe Curepipe - Souillac"}], "metroStations": [{"order": 1, "name": "Gare du Nord / Immigration", "city": "Port Louis", "lat": -20.1583734, "lon": 57.5047446}, {"order": 2, "name": "Place d'Armes", "city": "Port Louis", "lat": -20.1613065, "lon": 57.5007357}, {"order": 3, "name": "Victoria", "city": "Port Louis", "lat": -20.1626232, "lon": 57.4980481}, {"order": 4, "name": "St Louis", "city": "Port Louis", "lat": -20.1809483, "lon": 57.4768914}, {"order": 5, "name": "Coromandel", "city": "Beau Bassin-Rose Hill", "lat": -20.1836707, "lon": 57.4695515}, {"order": 6, "name": "Vandermeersch", "city": "Beau Bassin-Rose Hill", "lat": -20.2354365, "lon": 57.473088}, {"order": 7, "name": "Ebene", "city": "Quatre Bornes / Ebene", "lat": -20.2414482, "lon": 57.487933}, {"order": 8, "name": "Rose Hill Central", "city": "Beau Bassin-Rose Hill", "lat": -20.2418106, "lon": 57.4759244}, {"order": 9, "name": "Belle Rose", "city": "Quatre Bornes", "lat": -20.255926, "lon": 57.477722}, {"order": 10, "name": "Trianon", "city": "Quatre Bornes", "lat": -20.2611606, "lon": 57.4898794}, {"order": 11, "name": "St Jean", "city": "Quatre Bornes", "lat": -20.2617593, "lon": 57.4824626}, {"order": 12, "name": "Quatre Bornes Central", "city": "Quatre Bornes", "lat": -20.2651867, "lon": 57.4783706}, {"order": 13, "name": "Phoenix", "city": "Vacoas-Phoenix", "lat": -20.2750149, "lon": 57.4965191}, {"order": 14, "name": "Phoenix Mall", "city": "Vacoas-Phoenix", "lat": -20.279407, "lon": 57.4954403}, {"order": 15, "name": "Palmerston", "city": "Vacoas-Phoenix", "lat": -20.2852315, "lon": 57.4971927}, {"order": 16, "name": "Vacoas Central", "city": "Vacoas-Phoenix", "lat": -20.2944248, "lon": 57.4930503}, {"order": 17, "name": "Sadally", "city": "Vacoas-Phoenix", "lat": -20.302139, "lon": 57.4962328}, {"order": 18, "name": "Floreal", "city": "Vacoas-Phoenix", "lat": -20.3072663, "lon": 57.5070575}, {"order": 19, "name": "Curepipe", "city": "Curepipe", "lat": -20.3160964, "lon": 57.5252714}], "walkBB": [{"a": "Place Victoria Bus Terminal", "b": "Port Louis Victoria (Metro)", "region": "Port Louis", "dist_m": 56, "walk_min": 0.9}, {"a": "Immigration Square", "b": "Plaine Verte Bus Stop", "region": "Port Louis", "dist_m": 694, "walk_min": 10.8}, {"a": "United Bus Service Ltd", "b": "Vallijee Bus Station", "region": "Port Louis", "dist_m": 131, "walk_min": 2.0}, {"a": "Bus stop A.R. Mohamed St", "b": "Plaine Verte Bus Stop", "region": "Port Louis", "dist_m": 636, "walk_min": 9.9}, {"a": "Bus stop Terre Rouge (Winners)", "b": "Bus stop A1 Terre Rouge", "region": "Port Louis", "dist_m": 268, "walk_min": 4.2}, {"a": "Bus stop Terre Rouge (Winners)", "b": "Riche Terre Bus Terminal", "region": "Port Louis", "dist_m": 658, "walk_min": 10.3}, {"a": "Bus stop A1 Terre Rouge", "b": "Riche Terre Bus Terminal", "region": "Port Louis", "dist_m": 778, "walk_min": 12.1}, {"a": "Riche Terre Bus Terminal", "b": "Bus Stop R Terre", "region": "Port Louis", "dist_m": 596, "walk_min": 9.3}, {"a": "Pic Pic Bus Terminus", "b": "Pic Pic Bus Stop 4", "region": "Ouest", "dist_m": 360, "walk_min": 5.6}, {"a": "Pic Pic Bus Terminus", "b": "Pic Pic Bus Stop 1", "region": "Ouest", "dist_m": 78, "walk_min": 1.2}, {"a": "Pic Pic Bus Terminus", "b": "La Pointe Bus Stop", "region": "Ouest", "dist_m": 703, "walk_min": 11.0}, {"a": "Pic Pic Bus Stop 4", "b": "Pic Pic Bus Stop 1", "region": "Ouest", "dist_m": 283, "walk_min": 4.4}, {"a": "Pic Pic Bus Stop 4", "b": "La Pointe Bus Stop", "region": "Ouest", "dist_m": 363, "walk_min": 5.7}, {"a": "Pic Pic Bus Stop 1", "b": "La Pointe Bus Stop", "region": "Ouest", "dist_m": 625, "walk_min": 9.8}, {"a": "Bus Terminus Albion", "b": "Albion Terminus Bus", "region": "Ouest", "dist_m": 10, "walk_min": 0.1}, {"a": "Bambous Bus Terminal", "b": "Bus stop Bambous (Royal Rd)", "region": "Ouest", "dist_m": 527, "walk_min": 8.2}, {"a": "Flic en Flac Bus Terminus", "b": "Wolmar Traffic Centre", "region": "Ouest", "dist_m": 20, "walk_min": 0.3}, {"a": "Bus stop Flic en Flac (nord)", "b": "Bus stop Flic en Flac (Coastal Rd)", "region": "Ouest", "dist_m": 373, "walk_min": 5.8}, {"a": "Casela Bus Stop", "b": "Cascavelle Bus Terminal", "region": "Ouest", "dist_m": 160, "walk_min": 2.5}, {"a": "Gare bus Cascavelle", "b": "Bus stop Cascavelle (multi-lignes)", "region": "Ouest", "dist_m": 179, "walk_min": 2.8}, {"a": "Bus stop Tamarin (sud)", "b": "Bus stop Riviere Noire (nord)", "region": "Ouest", "dist_m": 471, "walk_min": 7.3}, {"a": "Bus stop Kaz a Pain", "b": "Bus stop Riviere Noire (centre)", "region": "Ouest", "dist_m": 794, "walk_min": 12.4}, {"a": "Bus stop Riviere Noire (sud)", "b": "Bus stop Grande Riviere Noire", "region": "Ouest", "dist_m": 594, "walk_min": 9.3}, {"a": "Bus stop La Gaulette (nord)", "b": "Bus stop La Gaulette (centre)", "region": "Ouest", "dist_m": 609, "walk_min": 9.5}, {"a": "Jan Palach Square - Bus Station", "b": "Jan Palach Sud - Bus Station", "region": "Centre", "dist_m": 117, "walk_min": 1.8}, {"a": "Rose Hill Bus Station", "b": "Bus Terminal Rose Hill (Busy Section)", "region": "Centre", "dist_m": 347, "walk_min": 5.4}, {"a": "Rose Hill Bus Station", "b": "Edward VII Bus Station", "region": "Centre", "dist_m": 282, "walk_min": 4.4}, {"a": "Rose Hill Bus Station", "b": "Place Jean Cardinal Margeot Bus Station", "region": "Centre", "dist_m": 19, "walk_min": 0.3}, {"a": "Bus Terminal Rose Hill (Busy Section)", "b": "Edward VII Bus Station", "region": "Centre", "dist_m": 126, "walk_min": 2.0}, {"a": "Bus Terminal Rose Hill (Busy Section)", "b": "Place Jean Cardinal Margeot Bus Station", "region": "Centre", "dist_m": 352, "walk_min": 5.5}, {"a": "Edward VII Bus Station", "b": "Place Jean Cardinal Margeot Bus Station", "region": "Centre", "dist_m": 293, "walk_min": 4.6}, {"a": "Quatre Bornes Bus Station", "b": "Quatre Bornes Central (tram)", "region": "Centre", "dist_m": 34, "walk_min": 0.5}, {"a": "Trianon Bus Stop", "b": "Trianon Bus Stop (M2)", "region": "Centre", "dist_m": 154, "walk_min": 2.4}, {"a": "Bus Stop Orange Tower", "b": "Ebene Tower Bus Stop", "region": "Centre", "dist_m": 260, "walk_min": 4.1}, {"a": "La Gare Phoenix Bus Stop", "b": "Phoenix Bus Stop (A10)", "region": "Centre", "dist_m": 709, "walk_min": 11.1}, {"a": "Reduit Bus Station", "b": "Bus Stop Moka (QGC3)", "region": "Centre", "dist_m": 556, "walk_min": 8.7}, {"a": "Bus stop Av. d'Helvetia", "b": "Helvetia (Les Promenades)", "region": "Centre", "dist_m": 657, "walk_min": 10.3}, {"a": "Upper Dagotiere Sub Hall Bus Stop", "b": "NHDC Bus Stop", "region": "Centre", "dist_m": 409, "walk_min": 6.4}, {"a": "Triolet Bus Service Ltd Terminus", "b": "Bus stop Trou-aux-Biches (XG7W)", "region": "Nord", "dist_m": 798, "walk_min": 12.5}, {"a": "Triolet Bus Service Ltd Terminus", "b": "Bus stop Royal Road Trou aux Biches", "region": "Nord", "dist_m": 482, "walk_min": 7.5}, {"a": "Bus stop Trou-aux-Biches (XG7W)", "b": "Bus stop Royal Road Trou aux Biches", "region": "Nord", "dist_m": 320, "walk_min": 5.0}, {"a": "Bus stop Powder Mill Rd", "b": "Bus Stop Boundary Rd", "region": "Nord", "dist_m": 554, "walk_min": 8.6}, {"a": "Bus stop Powder Mill Rd", "b": "Bus Stop Mahogany", "region": "Nord", "dist_m": 804, "walk_min": 12.6}, {"a": "Botanical Garden Bus Stop", "b": "Bus Stop Mahogany", "region": "Nord", "dist_m": 481, "walk_min": 7.5}, {"a": "Bus station Goodlands Bypass", "b": "New Bus Station Goodlands", "region": "Nord", "dist_m": 40, "walk_min": 0.6}, {"a": "Bus stop Cap Malheureux (2H6W)", "b": "Bus stop Grand Baie (2H5V FFW)", "region": "Nord", "dist_m": 479, "walk_min": 7.5}, {"a": "Bus stop Cap Malheureux (2H6W)", "b": "Arret de bus Grand Baie (centre)", "region": "Nord", "dist_m": 465, "walk_min": 7.3}, {"a": "Bus stop Cap Malheureux (2J87)", "b": "Bain Boeuf Bus Stop", "region": "Nord", "dist_m": 583, "walk_min": 9.1}, {"a": "Bus stop Cap Malheureux (2J87)", "b": "Bus stop Cap Malheureux (2J74)", "region": "Nord", "dist_m": 519, "walk_min": 8.1}, {"a": "Bus stop Cap Malheureux (2J79)", "b": "Notre-Dame Auxiliatrice Bus Stop", "region": "Nord", "dist_m": 261, "walk_min": 4.1}, {"a": "Bain Boeuf Bus Stop", "b": "Bus stop Cap Malheureux (2J74)", "region": "Nord", "dist_m": 73, "walk_min": 1.1}, {"a": "Bus stop Grand Baie MCB", "b": "Express Port Louis Bus Stand (Grand Baie)", "region": "Nord", "dist_m": 149, "walk_min": 2.3}, {"a": "Bus stop Grand Baie MCB", "b": "Bus stop Public Beach Grand Baie", "region": "Nord", "dist_m": 214, "walk_min": 3.3}, {"a": "Bus Station Pereybere (Royal Rd)", "b": "Bus stop Grand Baie (2H5V FFW)", "region": "Nord", "dist_m": 481, "walk_min": 7.5}, {"a": "Bus Station Pereybere (Royal Rd)", "b": "Bus stop Villa Marise", "region": "Nord", "dist_m": 688, "walk_min": 10.7}, {"a": "Bus Station Pereybere (Royal Rd)", "b": "Pereybere (1st Public Beach) Bus Stop", "region": "Nord", "dist_m": 31, "walk_min": 0.5}, {"a": "Bus Station Pereybere (Royal Rd)", "b": "Arret de bus Residence les Cygnes", "region": "Nord", "dist_m": 720, "walk_min": 11.2}, {"a": "Bus Station Pereybere (Royal Rd)", "b": "Arret de bus Grand Baie (centre)", "region": "Nord", "dist_m": 494, "walk_min": 7.7}, {"a": "Bus Stop Coastal Road Grand Baie", "b": "Express Port Louis Bus Stand (Grand Baie)", "region": "Nord", "dist_m": 773, "walk_min": 12.1}, {"a": "Bus Stop Coastal Road Grand Baie", "b": "Bus stop Public Beach Grand Baie", "region": "Nord", "dist_m": 703, "walk_min": 11.0}, {"a": "Bus Stop Coastal Road Grand Baie", "b": "Arret de bus Residence les Cygnes", "region": "Nord", "dist_m": 781, "walk_min": 12.2}, {"a": "Express Port Louis Bus Stand (Grand Baie)", "b": "Bus stop Public Beach Grand Baie", "region": "Nord", "dist_m": 72, "walk_min": 1.1}, {"a": "Bus stop Grand Baie (2H5V FFW)", "b": "Pereybere (1st Public Beach) Bus Stop", "region": "Nord", "dist_m": 451, "walk_min": 7.0}, {"a": "Bus stop Grand Baie (2H5V FFW)", "b": "Arret de bus Grand Baie (centre)", "region": "Nord", "dist_m": 14, "walk_min": 0.2}, {"a": "Bus stop Villa Marise", "b": "Pereybere (1st Public Beach) Bus Stop", "region": "Nord", "dist_m": 711, "walk_min": 11.1}, {"a": "Bus stop Villa Marise", "b": "Arret de bus Residence les Cygnes", "region": "Nord", "dist_m": 247, "walk_min": 3.9}, {"a": "Pereybere (1st Public Beach) Bus Stop", "b": "Arret de bus Residence les Cygnes", "region": "Nord", "dist_m": 749, "walk_min": 11.7}, {"a": "Pereybere (1st Public Beach) Bus Stop", "b": "Arret de bus Grand Baie (centre)", "region": "Nord", "dist_m": 465, "walk_min": 7.2}, {"a": "Roches Noires (localite)", "b": "Neel Transport (Roches Noires)", "region": "Est", "dist_m": 353, "walk_min": 5.5}, {"a": "Souillac Bus Terminal", "b": "CNT Bus Depot Souillac", "region": "Sud", "dist_m": 217, "walk_min": 3.4}, {"a": "Riviere Des Gallets Bus Station", "b": "Riviere Des Galets bus station (2)", "region": "Sud", "dist_m": 29, "walk_min": 0.5}, {"a": "Riviere Des Gallets Bus Station", "b": "Bus stop Chemin Grenier (FFX6)", "region": "Sud", "dist_m": 623, "walk_min": 9.7}, {"a": "Riviere Des Galets bus station (2)", "b": "Bus stop Chemin Grenier (FFX6)", "region": "Sud", "dist_m": 634, "walk_min": 9.9}, {"a": "Bus Stop to Curepipe (Riv. des Anguilles) 1", "b": "Bus Stop to Curepipe (Riv. des Anguilles) 2", "region": "Sud", "dist_m": 537, "walk_min": 8.4}, {"a": "Bus Stop to Curepipe (Riv. des Anguilles) 1", "b": "Bus Stop to Souillac (Riv. des Anguilles) 1", "region": "Sud", "dist_m": 616, "walk_min": 9.6}, {"a": "Bus Stop to Curepipe (Riv. des Anguilles) 1", "b": "Bus Stop to Souillac (Riv. des Anguilles) 2", "region": "Sud", "dist_m": 464, "walk_min": 7.2}, {"a": "Bus Stop to Curepipe (Riv. des Anguilles) 2", "b": "Bus Stop to Souillac (Riv. des Anguilles) 1", "region": "Sud", "dist_m": 85, "walk_min": 1.3}], "metroBus": [{"metro": "Gare du Nord / Immigration", "bus": "Port Louis Victoria (Metro)", "dist_m": 823, "walk_min": 12.8}, {"metro": "Gare du Nord / Immigration", "bus": "Immigration Square", "dist_m": 31, "walk_min": 0.5}, {"metro": "Gare du Nord / Immigration", "bus": "Plaine Verte Bus Stop", "dist_m": 694, "walk_min": 10.8}, {"metro": "Place d'Armes", "bus": "Place Victoria Bus Terminal", "dist_m": 341, "walk_min": 5.3}, {"metro": "Place d'Armes", "bus": "Port Louis Victoria (Metro)", "dist_m": 296, "walk_min": 4.6}, {"metro": "Place d'Armes", "bus": "Immigration Square", "dist_m": 548, "walk_min": 8.6}, {"metro": "Victoria", "bus": "Place Victoria Bus Terminal", "dist_m": 40, "walk_min": 0.6}, {"metro": "Victoria", "bus": "Port Louis Victoria (Metro)", "dist_m": 21, "walk_min": 0.3}, {"metro": "St Louis", "bus": "Bus Stop Les Guibies", "dist_m": 785, "walk_min": 12.3}, {"metro": "Coromandel", "bus": "Coromandel (tram/bus)", "dist_m": 18, "walk_min": 0.3}, {"metro": "Vandermeersch", "bus": "Rose Hill Bus Station", "dist_m": 779, "walk_min": 12.2}, {"metro": "Vandermeersch", "bus": "Place Jean Cardinal Margeot Bus Station", "dist_m": 780, "walk_min": 12.2}, {"metro": "Ebene", "bus": "Bus Stop Orange Tower", "dist_m": 361, "walk_min": 5.6}, {"metro": "Ebene", "bus": "Ebene Tower Bus Stop", "dist_m": 534, "walk_min": 8.3}, {"metro": "Rose Hill Central", "bus": "Rose Hill Bus Station", "dist_m": 29, "walk_min": 0.4}, {"metro": "Rose Hill Central", "bus": "Bus Terminal Rose Hill (Busy Section)", "dist_m": 366, "walk_min": 5.7}, {"metro": "Rose Hill Central", "bus": "Edward VII Bus Station", "dist_m": 307, "walk_min": 4.8}, {"metro": "Rose Hill Central", "bus": "Place Jean Cardinal Margeot Bus Station", "dist_m": 14, "walk_min": 0.2}, {"metro": "Trianon", "bus": "Trianon Bus Stop", "dist_m": 153, "walk_min": 2.4}, {"metro": "Trianon", "bus": "Trianon Bus Stop (M2)", "dist_m": 7, "walk_min": 0.1}, {"metro": "St Jean", "bus": "Quatre Bornes Bus Station", "dist_m": 590, "walk_min": 9.2}, {"metro": "St Jean", "bus": "Quatre Bornes Central (tram)", "dist_m": 569, "walk_min": 8.9}, {"metro": "St Jean", "bus": "Trianon Bus Stop", "dist_m": 777, "walk_min": 12.1}, {"metro": "St Jean", "bus": "Trianon Bus Stop (M2)", "dist_m": 784, "walk_min": 12.2}, {"metro": "Quatre Bornes Central", "bus": "Quatre Bornes Bus Station", "dist_m": 29, "walk_min": 0.5}, {"metro": "Quatre Bornes Central", "bus": "Quatre Bornes Central (tram)", "dist_m": 5, "walk_min": 0.1}, {"metro": "Phoenix Mall", "bus": "La Gare Phoenix Bus Stop", "dist_m": 579, "walk_min": 9.0}, {"metro": "Palmerston", "bus": "La Gare Phoenix Bus Stop", "dist_m": 167, "walk_min": 2.6}, {"metro": "Palmerston", "bus": "Phoenix Bus Stop (A10)", "dist_m": 821, "walk_min": 12.8}, {"metro": "Vacoas Central", "bus": "Vacoas Bus Station", "dist_m": 81, "walk_min": 1.3}, {"metro": "Curepipe", "bus": "Jan Palach Square - Bus Station", "dist_m": 89, "walk_min": 1.4}, {"metro": "Curepipe", "bus": "Jan Palach Sud - Bus Station", "dist_m": 203, "walk_min": 3.2}], "busLines": [{"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "1", "operator": "RHT", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "1", "operator": "RHT", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "1A", "operator": "RHT", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "1B", "operator": "RHT", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "1B", "operator": "RHT", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "1C", "operator": "RHT", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "1D", "operator": "RHT", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "2", "operator": "UBS", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "2", "operator": "UBS", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:La Gare Phoenix Bus Stop", "line": "2", "operator": "UBS", "dist_m": 5217, "ride_min": 19.2, "mountainous": false}, {"a": "bus:La Gare Phoenix Bus Stop", "b": "bus:Jan Palach Square - Bus Station", "line": "2", "operator": "UBS", "dist_m": 4648, "ride_min": 17.1, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "2A", "operator": "UBS", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "2A", "operator": "UBS", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:La Gare Phoenix Bus Stop", "line": "2A", "operator": "UBS", "dist_m": 5217, "ride_min": 19.2, "mountainous": false}, {"a": "bus:La Gare Phoenix Bus Stop", "b": "bus:Jan Palach Square - Bus Station", "line": "2A", "operator": "UBS", "dist_m": 4648, "ride_min": 17.1, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "3", "operator": "NTC", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "3", "operator": "NTC", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Quatre Bornes Bus Station", "line": "3", "operator": "NTC", "dist_m": 2628, "ride_min": 9.7, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "3", "operator": "NTC", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Candos (Victoria Hospital)", "b": "bus:Vacoas Bus Station", "line": "3", "operator": "NTC", "dist_m": 2545, "ride_min": 9.4, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "3A", "operator": "NTC", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "3A", "operator": "NTC", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Quatre Bornes Bus Station", "line": "3A", "operator": "NTC", "dist_m": 2628, "ride_min": 9.7, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "3A", "operator": "NTC", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Candos (Victoria Hospital)", "b": "bus:Vacoas Bus Station", "line": "3A", "operator": "NTC", "dist_m": 2545, "ride_min": 9.4, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "3B", "operator": "NTC", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "3B", "operator": "NTC", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Quatre Bornes Bus Station", "line": "3B", "operator": "NTC", "dist_m": 2628, "ride_min": 9.7, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "3B", "operator": "NTC", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "3C", "operator": "NTC", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "3C", "operator": "NTC", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Quatre Bornes Bus Station", "line": "3C", "operator": "NTC", "dist_m": 2628, "ride_min": 9.7, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "3D", "operator": "NTC", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "3D", "operator": "NTC", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Quatre Bornes Bus Station", "line": "3D", "operator": "NTC", "dist_m": 2628, "ride_min": 9.7, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "3D", "operator": "NTC", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "4", "operator": "NTC", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Candos (Victoria Hospital)", "b": "bus:Vacoas Bus Station", "line": "4", "operator": "NTC", "dist_m": 2545, "ride_min": 9.4, "mountainous": false}, {"a": "bus:Vacoas Bus Station", "b": "bus:Jan Palach Square - Bus Station", "line": "4", "operator": "NTC", "dist_m": 4172, "ride_min": 15.4, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "4A", "operator": "NTC", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Candos (Victoria Hospital)", "b": "bus:Vacoas Bus Station", "line": "4A", "operator": "NTC", "dist_m": 2545, "ride_min": 9.4, "mountainous": false}, {"a": "bus:Vacoas Bus Station", "b": "metro:Floreal", "line": "4A", "operator": "NTC", "dist_m": 1987, "ride_min": 7.3, "mountainous": false}, {"a": "metro:Floreal", "b": "bus:Jan Palach Square - Bus Station", "line": "4A", "operator": "NTC", "dist_m": 2218, "ride_min": 8.2, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Beaux Songes Bus Terminal", "line": "5", "operator": "IO/NTC", "dist_m": 5984, "ride_min": 22.0, "mountainous": false}, {"a": "bus:Beaux Songes Bus Terminal", "b": "bus:Bambous Bus Terminal", "line": "5", "operator": "IO/NTC", "dist_m": 2490, "ride_min": 9.2, "mountainous": false}, {"a": "bus:Bambous Bus Terminal", "b": "bus:Bus stop Riviere Noire (centre)", "line": "5", "operator": "IO/NTC", "dist_m": 11184, "ride_min": 41.2, "mountainous": false}, {"a": "bus:Bus stop Riviere Noire (centre)", "b": "bus:Bus stop Le Morne", "line": "5", "operator": "IO/NTC", "dist_m": 10511, "ride_min": 38.7, "mountainous": false}, {"a": "bus:Bus stop Le Morne", "b": "bus:Choisy/Baie du Cap Bus Station", "line": "5", "operator": "IO/NTC", "dist_m": 6059, "ride_min": 22.3, "mountainous": false}, {"a": "bus:Choisy/Baie du Cap Bus Station", "b": "bus:Bus 243 Last Stop (Chamarel)", "line": "5A", "operator": "IO/NTC", "dist_m": 6533, "ride_min": 24.1, "mountainous": false}, {"a": "bus:Jan Palach Sud - Bus Station", "b": "bus:Nouvelle France (bus stop)", "line": "6", "operator": "NTC", "dist_m": 8560, "ride_min": 31.5, "mountainous": false}, {"a": "bus:Nouvelle France (bus stop)", "b": "bus:Souillac Bus Terminal", "line": "6", "operator": "NTC", "dist_m": 15562, "ride_min": 57.3, "mountainous": false}, {"a": "bus:Souillac Bus Terminal", "b": "bus:Bus stop Chemin Grenier (FFX6)", "line": "6", "operator": "NTC", "dist_m": 6704, "ride_min": 24.7, "mountainous": false}, {"a": "bus:Bus stop Chemin Grenier (FFX6)", "b": "bus:Riviere Des Gallets Bus Station", "line": "6", "operator": "NTC", "dist_m": 623, "ride_min": 2.3, "mountainous": false}, {"a": "bus:Jan Palach Sud - Bus Station", "b": "bus:Nouvelle France (bus stop)", "line": "6A", "operator": "NTC", "dist_m": 8560, "ride_min": 31.5, "mountainous": false}, {"a": "bus:Nouvelle France (bus stop)", "b": "bus:Souillac Bus Terminal", "line": "6A", "operator": "NTC", "dist_m": 15562, "ride_min": 57.3, "mountainous": false}, {"a": "bus:Souillac Bus Terminal", "b": "bus:Bus stop Chemin Grenier (FFX6)", "line": "6A", "operator": "NTC", "dist_m": 6704, "ride_min": 24.7, "mountainous": false}, {"a": "bus:Jan Palach Sud - Bus Station", "b": "bus:Nouvelle France (bus stop)", "line": "6B", "operator": "NTC", "dist_m": 8560, "ride_min": 31.5, "mountainous": false}, {"a": "bus:Nouvelle France (bus stop)", "b": "bus:Souillac Bus Terminal", "line": "6B", "operator": "NTC", "dist_m": 15562, "ride_min": 57.3, "mountainous": false}, {"a": "bus:Souillac Bus Terminal", "b": "bus:Bus stop Chemin Grenier (FFX6)", "line": "7", "operator": "NTC", "dist_m": 6704, "ride_min": 24.7, "mountainous": false}, {"a": "bus:Bus stop Chemin Grenier (FFX6)", "b": "bus:Riviere Des Gallets Bus Station", "line": "7", "operator": "NTC", "dist_m": 623, "ride_min": 2.3, "mountainous": false}, {"a": "bus:Souillac Bus Terminal", "b": "bus:Bus stop Chemin Grenier (FFX6)", "line": "8", "operator": "NTC", "dist_m": 6704, "ride_min": 24.7, "mountainous": false}, {"a": "bus:Bus stop Chemin Grenier (FFX6)", "b": "bus:Choisy/Baie du Cap Bus Station", "line": "8", "operator": "NTC", "dist_m": 8588, "ride_min": 31.6, "mountainous": false}, {"a": "bus:Souillac Bus Terminal", "b": "bus:Bus stop Chemin Grenier (FFX6)", "line": "8B", "operator": "NTC", "dist_m": 6704, "ride_min": 24.7, "mountainous": false}, {"a": "bus:Bus stop Chemin Grenier (FFX6)", "b": "bus:Choisy/Baie du Cap Bus Station", "line": "8B", "operator": "NTC", "dist_m": 8588, "ride_min": 31.6, "mountainous": false}, {"a": "bus:Jan Palach Sud - Bus Station", "b": "poi:Aéroport SSR (Plaine Magnien)", "line": "9", "operator": "IO", "dist_m": 20442, "ride_min": 75.3, "mountainous": false}, {"a": "poi:Aéroport SSR (Plaine Magnien)", "b": "bus:Mahebourg Bus Terminal", "line": "9", "operator": "IO", "dist_m": 4339, "ride_min": 16.0, "mountainous": false}, {"a": "bus:Mahebourg Bus Terminal", "b": "poi:Aéroport SSR (Plaine Magnien)", "line": "10", "operator": "IO", "dist_m": 4339, "ride_min": 16.0, "mountainous": false}, {"a": "poi:Aéroport SSR (Plaine Magnien)", "b": "bus:Souillac Bus Terminal", "line": "10", "operator": "IO", "dist_m": 18860, "ride_min": 69.4, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:St. Pierre Traffic Centre", "line": "12", "operator": "IO", "dist_m": 8214, "ride_min": 30.2, "mountainous": false}, {"a": "bus:St. Pierre Traffic Centre", "b": "bus:Quartier-Militaire Bus Station", "line": "12", "operator": "IO", "dist_m": 6662, "ride_min": 24.5, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:St. Pierre Traffic Centre", "line": "12A", "operator": "IO", "dist_m": 8214, "ride_min": 30.2, "mountainous": false}, {"a": "bus:St. Pierre Traffic Centre", "b": "bus:Quartier-Militaire Bus Station", "line": "12A", "operator": "IO", "dist_m": 6662, "ride_min": 24.5, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Reduit Bus Station", "line": "13", "operator": "IO", "dist_m": 2613, "ride_min": 9.6, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:St. Pierre Traffic Centre", "line": "13", "operator": "IO", "dist_m": 4412, "ride_min": 16.2, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Reduit Bus Station", "line": "13A", "operator": "IO", "dist_m": 2613, "ride_min": 9.6, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Helvetia (Les Promenades)", "line": "13A", "operator": "IO", "dist_m": 2872, "ride_min": 10.6, "mountainous": false}, {"a": "bus:Helvetia (Les Promenades)", "b": "bus:St. Pierre Traffic Centre", "line": "13A", "operator": "IO", "dist_m": 1545, "ride_min": 5.7, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Reduit Bus Station", "line": "13D", "operator": "IO", "dist_m": 2613, "ride_min": 9.6, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Helvetia (Les Promenades)", "line": "13D", "operator": "IO", "dist_m": 2872, "ride_min": 10.6, "mountainous": false}, {"a": "bus:Helvetia (Les Promenades)", "b": "bus:St. Pierre Traffic Centre", "line": "13D", "operator": "IO", "dist_m": 1545, "ride_min": 5.7, "mountainous": false}, {"a": "bus:Jan Palach Sud - Bus Station", "b": "bus:Rose Belle Bus Terminal", "line": "14", "operator": "NTC", "dist_m": 12031, "ride_min": 44.3, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Reduit Bus Station", "line": "15", "operator": "IO", "dist_m": 2613, "ride_min": 9.6, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Helvetia (Les Promenades)", "line": "15", "operator": "IO", "dist_m": 2872, "ride_min": 10.6, "mountainous": false}, {"a": "bus:Helvetia (Les Promenades)", "b": "bus:St. Pierre Traffic Centre", "line": "15", "operator": "IO", "dist_m": 1545, "ride_min": 5.7, "mountainous": false}, {"a": "bus:St. Pierre Traffic Centre", "b": "bus:Quartier-Militaire Bus Station", "line": "15", "operator": "IO", "dist_m": 6662, "ride_min": 24.5, "mountainous": false}, {"a": "bus:Quartier-Militaire Bus Station", "b": "bus:Flacq Bus Station", "line": "15", "operator": "IO", "dist_m": 14579, "ride_min": 53.7, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Reduit Bus Station", "line": "15A", "operator": "IO", "dist_m": 2613, "ride_min": 9.6, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Helvetia (Les Promenades)", "line": "15A", "operator": "IO", "dist_m": 2872, "ride_min": 10.6, "mountainous": false}, {"a": "bus:Helvetia (Les Promenades)", "b": "bus:St. Pierre Traffic Centre", "line": "15A", "operator": "IO", "dist_m": 1545, "ride_min": 5.7, "mountainous": false}, {"a": "bus:St. Pierre Traffic Centre", "b": "bus:Quartier-Militaire Bus Station", "line": "15A", "operator": "IO", "dist_m": 6662, "ride_min": 24.5, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Reduit Bus Station", "line": "15C", "operator": "IO", "dist_m": 2613, "ride_min": 9.6, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Helvetia (Les Promenades)", "line": "15C", "operator": "IO", "dist_m": 2872, "ride_min": 10.6, "mountainous": false}, {"a": "bus:Helvetia (Les Promenades)", "b": "bus:St. Pierre Traffic Centre", "line": "15C", "operator": "IO", "dist_m": 1545, "ride_min": 5.7, "mountainous": false}, {"a": "bus:St. Pierre Traffic Centre", "b": "bus:Quartier-Militaire Bus Station", "line": "15C", "operator": "IO", "dist_m": 6662, "ride_min": 24.5, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Reduit Bus Station", "line": "15D", "operator": "IO", "dist_m": 2613, "ride_min": 9.6, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Helvetia (Les Promenades)", "line": "15D", "operator": "IO", "dist_m": 2872, "ride_min": 10.6, "mountainous": false}, {"a": "bus:Helvetia (Les Promenades)", "b": "bus:St. Pierre Traffic Centre", "line": "15D", "operator": "IO", "dist_m": 1545, "ride_min": 5.7, "mountainous": false}, {"a": "bus:St. Pierre Traffic Centre", "b": "bus:Quartier-Militaire Bus Station", "line": "15D", "operator": "IO", "dist_m": 6662, "ride_min": 24.5, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Reduit Bus Station", "line": "16", "operator": "IO", "dist_m": 2613, "ride_min": 9.6, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Helvetia (Les Promenades)", "line": "16", "operator": "IO", "dist_m": 2872, "ride_min": 10.6, "mountainous": false}, {"a": "bus:Helvetia (Les Promenades)", "b": "bus:St. Pierre Traffic Centre", "line": "16", "operator": "IO", "dist_m": 1545, "ride_min": 5.7, "mountainous": false}, {"a": "bus:St. Pierre Traffic Centre", "b": "bus:Quartier-Militaire Bus Station", "line": "16", "operator": "IO", "dist_m": 6662, "ride_min": 24.5, "mountainous": false}, {"a": "bus:Quartier-Militaire Bus Station", "b": "bus:Flacq Bus Station", "line": "16", "operator": "IO", "dist_m": 14579, "ride_min": 53.7, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Reduit Bus Station", "line": "16A", "operator": "IO", "dist_m": 2613, "ride_min": 9.6, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Helvetia (Les Promenades)", "line": "16A", "operator": "IO", "dist_m": 2872, "ride_min": 10.6, "mountainous": false}, {"a": "bus:Helvetia (Les Promenades)", "b": "bus:St. Pierre Traffic Centre", "line": "16A", "operator": "IO", "dist_m": 1545, "ride_min": 5.7, "mountainous": false}, {"a": "bus:St. Pierre Traffic Centre", "b": "bus:Quartier-Militaire Bus Station", "line": "16A", "operator": "IO", "dist_m": 6662, "ride_min": 24.5, "mountainous": false}, {"a": "bus:Quartier-Militaire Bus Station", "b": "bus:Flacq Bus Station", "line": "16A", "operator": "IO", "dist_m": 14579, "ride_min": 53.7, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Reduit Bus Station", "line": "16D", "operator": "IO", "dist_m": 2613, "ride_min": 9.6, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Helvetia (Les Promenades)", "line": "16D", "operator": "IO", "dist_m": 2872, "ride_min": 10.6, "mountainous": false}, {"a": "bus:Helvetia (Les Promenades)", "b": "bus:St. Pierre Traffic Centre", "line": "16D", "operator": "IO", "dist_m": 1545, "ride_min": 5.7, "mountainous": false}, {"a": "bus:St. Pierre Traffic Centre", "b": "bus:Quartier-Militaire Bus Station", "line": "16D", "operator": "IO", "dist_m": 6662, "ride_min": 24.5, "mountainous": false}, {"a": "bus:Quartier-Militaire Bus Station", "b": "bus:Flacq Bus Station", "line": "16D", "operator": "IO", "dist_m": 14579, "ride_min": 53.7, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "bus:Quartier-Militaire Bus Station", "line": "17", "operator": "IO", "dist_m": 10887, "ride_min": 40.1, "mountainous": false}, {"a": "bus:Quartier-Militaire Bus Station", "b": "bus:Flacq Bus Station", "line": "17", "operator": "IO", "dist_m": 14579, "ride_min": 53.7, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "bus:Quartier-Militaire Bus Station", "line": "17A", "operator": "IO", "dist_m": 10887, "ride_min": 40.1, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "bus:Quartier-Militaire Bus Station", "line": "17C", "operator": "IO", "dist_m": 10887, "ride_min": 40.1, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "bus:Quartier-Militaire Bus Station", "line": "17D", "operator": "IO", "dist_m": 10887, "ride_min": 40.1, "mountainous": false}, {"a": "bus:Quartier-Militaire Bus Station", "b": "bus:Flacq Bus Station", "line": "17E", "operator": "IO", "dist_m": 14579, "ride_min": 53.7, "mountainous": false}, {"a": "bus:Quartier-Militaire Bus Station", "b": "bus:Flacq Bus Station", "line": "17F", "operator": "IO", "dist_m": 14579, "ride_min": 53.7, "mountainous": false}, {"a": "bus:Flacq Bus Station", "b": "bus:Mahebourg Bus Terminal", "line": "18", "operator": "IO", "dist_m": 24131, "ride_min": 88.8, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "19", "operator": "MBT", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Creve Coeur Bus Station (Terminus)", "line": "19", "operator": "MBT", "dist_m": 7101, "ride_min": 26.1, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "20", "operator": "TBS", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Triolet Bus Service Ltd Terminus", "line": "20", "operator": "TBS", "dist_m": 11078, "ride_min": 40.8, "mountainous": false}, {"a": "bus:Triolet Bus Service Ltd Terminus", "b": "bus:Terminus Trou Aux Biches", "line": "20", "operator": "TBS", "dist_m": 2730, "ride_min": 10.0, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "20A", "operator": "TBS", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Triolet Bus Service Ltd Terminus", "line": "20A", "operator": "TBS", "dist_m": 11078, "ride_min": 40.8, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "20C", "operator": "TBS", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:SSRN Hospital Bus Stand", "line": "20C", "operator": "TBS", "dist_m": 6104, "ride_min": 22.5, "mountainous": false}, {"a": "bus:SSRN Hospital Bus Stand", "b": "bus:Triolet Bus Service Ltd Terminus", "line": "20C", "operator": "TBS", "dist_m": 5806, "ride_min": 21.4, "mountainous": false}, {"a": "bus:Triolet Bus Service Ltd Terminus", "b": "bus:Terminus Trou Aux Biches", "line": "20C", "operator": "TBS", "dist_m": 2730, "ride_min": 10.0, "mountainous": false}, {"a": "bus:Terminus Trou Aux Biches", "b": "bus:Bus stop Grand Baie MCB", "line": "20C", "operator": "TBS", "dist_m": 7256, "ride_min": 26.7, "mountainous": false}, {"a": "bus:Bus stop Grand Baie MCB", "b": "bus:Bus Station Pereybere (Royal Rd)", "line": "20C", "operator": "TBS", "dist_m": 2064, "ride_min": 7.6, "mountainous": false}, {"a": "bus:Bus Station Pereybere (Royal Rd)", "b": "bus:Cap Malheureux Bus Station (Pavillon)", "line": "20C", "operator": "TBS", "dist_m": 2421, "ride_min": 8.9, "mountainous": false}, {"a": "bus:Cap Malheureux Bus Station (Pavillon)", "b": "bus:Goodlands Bus Station", "line": "20C", "operator": "TBS", "dist_m": 6814, "ride_min": 25.1, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "20D", "operator": "TBS", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Triolet Bus Service Ltd Terminus", "line": "20D", "operator": "TBS", "dist_m": 11078, "ride_min": 40.8, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "21", "operator": "IO", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:SSRN Hospital Bus Stand", "line": "21", "operator": "IO", "dist_m": 6104, "ride_min": 22.5, "mountainous": false}, {"a": "bus:SSRN Hospital Bus Stand", "b": "bus:Goodlands Bus Station", "line": "21", "operator": "IO", "dist_m": 11435, "ride_min": 42.1, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "22", "operator": "IO", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Botanical Garden Bus Stop", "line": "22", "operator": "IO", "dist_m": 7268, "ride_min": 26.8, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:Goodlands Bus Station", "line": "22", "operator": "IO", "dist_m": 9963, "ride_min": 36.7, "mountainous": false}, {"a": "bus:Goodlands Bus Station", "b": "bus:Bus stop Grand Gaube", "line": "22", "operator": "IO", "dist_m": 2904, "ride_min": 10.7, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "23", "operator": "NTC", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Botanical Garden Bus Stop", "line": "23", "operator": "NTC", "dist_m": 7268, "ride_min": 26.8, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:Bus stop Poudre d'Or", "line": "23", "operator": "NTC", "dist_m": 11142, "ride_min": 41.0, "mountainous": false}, {"a": "bus:Bus stop Poudre d'Or", "b": "bus:Riviere Du Rempart Bus Terminal", "line": "23", "operator": "NTC", "dist_m": 4864, "ride_min": 17.9, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "23A", "operator": "NTC", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Botanical Garden Bus Stop", "line": "23A", "operator": "NTC", "dist_m": 7268, "ride_min": 26.8, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:Bus stop Poudre d'Or", "line": "23A", "operator": "NTC", "dist_m": 11142, "ride_min": 41.0, "mountainous": false}, {"a": "bus:Bus stop Poudre d'Or", "b": "bus:Riviere Du Rempart Bus Terminal", "line": "23A", "operator": "NTC", "dist_m": 4864, "ride_min": 17.9, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "23B", "operator": "NTC", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Botanical Garden Bus Stop", "line": "23B", "operator": "NTC", "dist_m": 7268, "ride_min": 26.8, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:Bus stop Poudre d'Or", "line": "23B", "operator": "NTC", "dist_m": 11142, "ride_min": 41.0, "mountainous": false}, {"a": "bus:Bus stop Poudre d'Or", "b": "bus:Riviere Du Rempart Bus Terminal", "line": "23B", "operator": "NTC", "dist_m": 4864, "ride_min": 17.9, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "24", "operator": "NTC", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Botanical Garden Bus Stop", "line": "24", "operator": "NTC", "dist_m": 7268, "ride_min": 26.8, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:Riviere Du Rempart Bus Terminal", "line": "24", "operator": "NTC", "dist_m": 12179, "ride_min": 44.8, "mountainous": false}, {"a": "bus:Bus stop Poudre d'Or", "b": "bus:Riviere Du Rempart Bus Terminal", "line": "26", "operator": "IO", "dist_m": 4864, "ride_min": 17.9, "mountainous": false}, {"a": "bus:Riviere Du Rempart Bus Terminal", "b": "bus:Neel Transport (Roches Noires)", "line": "26", "operator": "IO", "dist_m": 2427, "ride_min": 8.9, "mountainous": false}, {"a": "bus:Neel Transport (Roches Noires)", "b": "bus:Flacq Bus Station", "line": "26", "operator": "IO", "dist_m": 8478, "ride_min": 31.2, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "27", "operator": "NTC", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Botanical Garden Bus Stop", "line": "27", "operator": "NTC", "dist_m": 7268, "ride_min": 26.8, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:Riviere Du Rempart Bus Terminal", "line": "27", "operator": "NTC", "dist_m": 12179, "ride_min": 44.8, "mountainous": false}, {"a": "bus:Triolet Bus Service Ltd Terminus", "b": "bus:Riviere Du Rempart Bus Terminal", "line": "28", "operator": "TBS", "dist_m": 16806, "ride_min": 61.9, "mountainous": false}, {"a": "bus:Riviere Du Rempart Bus Terminal", "b": "bus:Bus stop Grand Baie MCB", "line": "29", "operator": "TBS", "dist_m": 15746, "ride_min": 58.0, "mountainous": false}, {"a": "bus:Souillac Bus Terminal", "b": "bus:Riviere Des Gallets Bus Station", "line": "32", "operator": "NTC", "dist_m": 7102, "ride_min": 26.1, "mountainous": false}, {"a": "bus:Vallijee Bus Station", "b": "bus:Plaine Verte Bus Stop", "line": "33A", "operator": "UBS", "dist_m": 3330, "ride_min": 12.3, "mountainous": false}, {"a": "bus:Plaine Verte Bus Stop", "b": "bus:Terre Rouge (bus stop)", "line": "33A", "operator": "UBS", "dist_m": 2502, "ride_min": 9.2, "mountainous": false}, {"a": "bus:Plaine Verte Bus Stop", "b": "bus:Vallijee Bus Station", "line": "33B", "operator": "UBS", "dist_m": 3330, "ride_min": 12.3, "mountainous": false}, {"a": "bus:Jan Palach Sud - Bus Station", "b": "bus:Nouvelle France (bus stop)", "line": "34", "operator": "NTC", "dist_m": 8560, "ride_min": 31.5, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Cite La Cure Bus Terminal", "line": "36", "operator": "UBS", "dist_m": 3032, "ride_min": 11.2, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "bus:Vacoas Bus Station", "line": "37", "operator": "NTC", "dist_m": 4172, "ride_min": 15.4, "mountainous": false}, {"a": "bus:Vacoas Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "37", "operator": "NTC", "dist_m": 2545, "ride_min": 9.4, "mountainous": false}, {"a": "bus:Candos (Victoria Hospital)", "b": "bus:Quatre Bornes Bus Station", "line": "37", "operator": "NTC", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "metro:Floreal", "line": "37A", "operator": "NTC", "dist_m": 2218, "ride_min": 8.2, "mountainous": false}, {"a": "metro:Floreal", "b": "bus:Vacoas Bus Station", "line": "37A", "operator": "NTC", "dist_m": 1987, "ride_min": 7.3, "mountainous": false}, {"a": "bus:Vacoas Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "37A", "operator": "NTC", "dist_m": 2545, "ride_min": 9.4, "mountainous": false}, {"a": "bus:Candos (Victoria Hospital)", "b": "bus:Quatre Bornes Bus Station", "line": "37A", "operator": "NTC", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Plaine Verte Bus Stop", "line": "41", "operator": "UBS", "dist_m": 694, "ride_min": 2.6, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "42", "operator": "UBS", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Plaine Verte Bus Stop", "line": "43", "operator": "IO", "dist_m": 694, "ride_min": 2.6, "mountainous": false}, {"a": "bus:Plaine Verte Bus Stop", "b": "bus:Place Victoria Bus Terminal", "line": "43", "operator": "IO", "dist_m": 1510, "ride_min": 5.6, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Vallijee Bus Station", "line": "47", "operator": "UBS", "dist_m": 2687, "ride_min": 9.9, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Plaine Verte Bus Stop", "line": "48", "operator": "UBS", "dist_m": 694, "ride_min": 2.6, "mountainous": false}, {"a": "bus:Plaine Verte Bus Stop", "b": "bus:Cite La Cure Bus Terminal", "line": "48", "operator": "UBS", "dist_m": 2339, "ride_min": 8.6, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Pic Pic Bus Terminus", "line": "51", "operator": "TBS", "dist_m": 7581, "ride_min": 27.9, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Bambous Bus Terminal", "line": "52", "operator": "NTC", "dist_m": 15329, "ride_min": 56.4, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Albion Beach Traffic Center", "line": "52A", "operator": "NTC", "dist_m": 12002, "ride_min": 44.2, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Bambous Bus Terminal", "line": "52C", "operator": "NTC", "dist_m": 15329, "ride_min": 56.4, "mountainous": false}, {"a": "bus:Bus stop Poudre d'Or", "b": "bus:Riviere Du Rempart Bus Terminal", "line": "53", "operator": "IO", "dist_m": 4864, "ride_min": 17.9, "mountainous": false}, {"a": "bus:Riviere Du Rempart Bus Terminal", "b": "bus:Flacq Bus Station", "line": "53", "operator": "IO", "dist_m": 9911, "ride_min": 36.5, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Beaux Songes Bus Terminal", "line": "57", "operator": "IO", "dist_m": 5984, "ride_min": 22.0, "mountainous": false}, {"a": "bus:Beaux Songes Bus Terminal", "b": "bus:Bambous Bus Terminal", "line": "57", "operator": "IO", "dist_m": 2490, "ride_min": 9.2, "mountainous": false}, {"a": "bus:Bambous Bus Terminal", "b": "bus:Flic en Flac Bus Terminus", "line": "57", "operator": "IO", "dist_m": 6559, "ride_min": 24.2, "mountainous": false}, {"a": "bus:Flic en Flac Bus Terminus", "b": "bus:Wolmar Traffic Centre", "line": "57", "operator": "IO", "dist_m": 20, "ride_min": 0.1, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Beaux Songes Bus Terminal", "line": "57A", "operator": "IO", "dist_m": 5984, "ride_min": 22.0, "mountainous": false}, {"a": "bus:Beaux Songes Bus Terminal", "b": "bus:Bus stop Cascavelle (multi-lignes)", "line": "57A", "operator": "IO", "dist_m": 2171, "ride_min": 8.0, "mountainous": false}, {"a": "bus:Jan Palach Sud - Bus Station", "b": "bus:Nouvelle France (bus stop)", "line": "61", "operator": "NTC", "dist_m": 8560, "ride_min": 31.5, "mountainous": false}, {"a": "bus:Jan Palach Sud - Bus Station", "b": "bus:Nouvelle France (bus stop)", "line": "62", "operator": "IO", "dist_m": 8560, "ride_min": 31.5, "mountainous": false}, {"a": "bus:Nouvelle France (bus stop)", "b": "bus:Rose Belle Bus Terminal", "line": "62", "operator": "IO", "dist_m": 3820, "ride_min": 14.1, "mountainous": false}, {"a": "bus:Neel Transport (Roches Noires)", "b": "bus:Riviere Du Rempart Bus Terminal", "line": "63", "operator": "NTC", "dist_m": 2427, "ride_min": 8.9, "mountainous": false}, {"a": "bus:Riviere Du Rempart Bus Terminal", "b": "bus:SSRN Hospital Bus Stand", "line": "63", "operator": "NTC", "dist_m": 14634, "ride_min": 53.9, "mountainous": false}, {"a": "bus:Vacoas Bus Station", "b": "bus:La Gare Phoenix Bus Stop", "line": "65", "operator": "UBS", "dist_m": 1349, "ride_min": 5.0, "mountainous": false}, {"a": "bus:La Gare Phoenix Bus Stop", "b": "bus:Hermitage Bus Station", "line": "65", "operator": "UBS", "dist_m": 4424, "ride_min": 16.3, "mountainous": false}, {"a": "bus:Candos (Victoria Hospital)", "b": "bus:Vacoas Bus Station", "line": "68", "operator": "NTC", "dist_m": 2545, "ride_min": 9.4, "mountainous": false}, {"a": "bus:Vacoas Bus Station", "b": "bus:Jan Palach Square - Bus Station", "line": "68", "operator": "NTC", "dist_m": 4172, "ride_min": 15.4, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "69", "operator": "NTC", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "69", "operator": "NTC", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Quatre Bornes Bus Station", "line": "69", "operator": "NTC", "dist_m": 2628, "ride_min": 9.7, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Beaux Songes Bus Terminal", "line": "69", "operator": "NTC", "dist_m": 5984, "ride_min": 22.0, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Cite La Cure Bus Terminal", "line": "70", "operator": "IO", "dist_m": 3032, "ride_min": 11.2, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "71", "operator": "NTC/IO", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Botanical Garden Bus Stop", "line": "71", "operator": "NTC/IO", "dist_m": 7268, "ride_min": 26.8, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Riche Terre Bus Terminal", "line": "72", "operator": "UBS", "dist_m": 3681, "ride_min": 13.6, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "bus:Hermitage Bus Station", "line": "73", "operator": "UBS", "dist_m": 4886, "ride_min": 18.0, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:SSRN Hospital Bus Stand", "line": "75", "operator": "TBS", "dist_m": 2554, "ride_min": 9.4, "mountainous": false}, {"a": "bus:SSRN Hospital Bus Stand", "b": "bus:Triolet Bus Service Ltd Terminus", "line": "75", "operator": "TBS", "dist_m": 5806, "ride_min": 21.4, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "77", "operator": "IO", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Plaine Verte Bus Stop", "line": "78", "operator": "UBS", "dist_m": 694, "ride_min": 2.6, "mountainous": false}, {"a": "bus:Plaine Verte Bus Stop", "b": "bus:Riche Terre Bus Terminal", "line": "78", "operator": "UBS", "dist_m": 3336, "ride_min": 12.3, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "bus:Quartier-Militaire Bus Station", "line": "80", "operator": "IO", "dist_m": 10887, "ride_min": 40.1, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "82", "operator": "TBS", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Triolet Bus Service Ltd Terminus", "line": "82", "operator": "TBS", "dist_m": 11078, "ride_min": 40.8, "mountainous": false}, {"a": "bus:Triolet Bus Service Ltd Terminus", "b": "bus:Terminus Trou Aux Biches", "line": "82", "operator": "TBS", "dist_m": 2730, "ride_min": 10.0, "mountainous": false}, {"a": "bus:Terminus Trou Aux Biches", "b": "bus:Bus stop Grand Baie MCB", "line": "82", "operator": "TBS", "dist_m": 7256, "ride_min": 26.7, "mountainous": false}, {"a": "bus:Bus stop Grand Baie MCB", "b": "bus:Bus Station Pereybere (Royal Rd)", "line": "82", "operator": "TBS", "dist_m": 2064, "ride_min": 7.6, "mountainous": false}, {"a": "bus:Bus Station Pereybere (Royal Rd)", "b": "bus:Goodlands Bus Station", "line": "82", "operator": "TBS", "dist_m": 8381, "ride_min": 30.9, "mountainous": false}, {"a": "bus:Goodlands Bus Station", "b": "bus:Cap Malheureux Bus Station (Pavillon)", "line": "82", "operator": "TBS", "dist_m": 6814, "ride_min": 25.1, "mountainous": false}, {"a": "bus:Riviere Du Rempart Bus Terminal", "b": "bus:SSRN Hospital Bus Stand", "line": "84", "operator": "NTC", "dist_m": 14634, "ride_min": 53.9, "mountainous": false}, {"a": "bus:Riviere Du Rempart Bus Terminal", "b": "bus:Bus stop Poudre d'Or", "line": "85", "operator": "NTC", "dist_m": 4864, "ride_min": 17.9, "mountainous": false}, {"a": "bus:Bus stop Poudre d'Or", "b": "bus:SSRN Hospital Bus Stand", "line": "85", "operator": "NTC", "dist_m": 13175, "ride_min": 48.5, "mountainous": false}, {"a": "bus:SSRN Hospital Bus Stand", "b": "bus:Terre Rouge (bus stop)", "line": "85", "operator": "NTC", "dist_m": 6104, "ride_min": 22.5, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Immigration Square", "line": "85", "operator": "NTC", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Riviere Du Rempart Bus Terminal", "b": "bus:Bus stop Poudre d'Or", "line": "86", "operator": "NTC", "dist_m": 4864, "ride_min": 17.9, "mountainous": false}, {"a": "bus:Bus stop Poudre d'Or", "b": "bus:Botanical Garden Bus Stop", "line": "86", "operator": "NTC", "dist_m": 11142, "ride_min": 41.0, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:SSRN Hospital Bus Stand", "line": "86", "operator": "NTC", "dist_m": 2554, "ride_min": 9.4, "mountainous": false}, {"a": "bus:SSRN Hospital Bus Stand", "b": "bus:Terre Rouge (bus stop)", "line": "86", "operator": "NTC", "dist_m": 6104, "ride_min": 22.5, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Immigration Square", "line": "86", "operator": "NTC", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "88", "operator": "IO", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:SSRN Hospital Bus Stand", "line": "88", "operator": "IO", "dist_m": 6104, "ride_min": 22.5, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "89", "operator": "MBT", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Jan Palach Sud - Bus Station", "b": "poi:Aéroport SSR (Plaine Magnien)", "line": "90", "operator": "IO", "dist_m": 20442, "ride_min": 75.3, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Reduit Bus Station", "line": "93", "operator": "IO", "dist_m": 7710, "ride_min": 28.4, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Helvetia (Les Promenades)", "line": "93", "operator": "IO", "dist_m": 2872, "ride_min": 10.6, "mountainous": false}, {"a": "bus:Helvetia (Les Promenades)", "b": "bus:St. Pierre Traffic Centre", "line": "93", "operator": "IO", "dist_m": 1545, "ride_min": 5.7, "mountainous": false}, {"a": "bus:St. Pierre Traffic Centre", "b": "bus:Quartier-Militaire Bus Station", "line": "93", "operator": "IO", "dist_m": 6662, "ride_min": 24.5, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:SSRN Hospital Bus Stand", "line": "95", "operator": "TBS", "dist_m": 2554, "ride_min": 9.4, "mountainous": false}, {"a": "bus:SSRN Hospital Bus Stand", "b": "bus:Triolet Bus Service Ltd Terminus", "line": "95", "operator": "TBS", "dist_m": 5806, "ride_min": 21.4, "mountainous": false}, {"a": "bus:Triolet Bus Service Ltd Terminus", "b": "bus:Terminus Trou Aux Biches", "line": "95", "operator": "TBS", "dist_m": 2730, "ride_min": 10.0, "mountainous": false}, {"a": "bus:Terminus Trou Aux Biches", "b": "bus:Bus stop Grand Baie MCB", "line": "95", "operator": "TBS", "dist_m": 7256, "ride_min": 26.7, "mountainous": false}, {"a": "bus:Bus stop Grand Baie MCB", "b": "bus:Bus Station Pereybere (Royal Rd)", "line": "95", "operator": "TBS", "dist_m": 2064, "ride_min": 7.6, "mountainous": false}, {"a": "bus:Bus Station Pereybere (Royal Rd)", "b": "bus:Cap Malheureux Bus Station (Pavillon)", "line": "95", "operator": "TBS", "dist_m": 2421, "ride_min": 8.9, "mountainous": false}, {"a": "bus:Cap Malheureux Bus Station (Pavillon)", "b": "bus:Bus stop Grand Gaube", "line": "95", "operator": "TBS", "dist_m": 5403, "ride_min": 19.9, "mountainous": false}, {"a": "bus:Bus stop Grand Gaube", "b": "bus:Goodlands Bus Station", "line": "95", "operator": "TBS", "dist_m": 2904, "ride_min": 10.7, "mountainous": false}, {"a": "bus:Creve Coeur Bus Station (Terminus)", "b": "bus:Terre Rouge (bus stop)", "line": "96", "operator": "MBT", "dist_m": 7101, "ride_min": 26.1, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Riche Terre Bus Terminal", "line": "96", "operator": "MBT", "dist_m": 1106, "ride_min": 4.1, "mountainous": false}, {"a": "bus:Flacq Bus Station", "b": "bus:Botanical Garden Bus Stop", "line": "101", "operator": "IO", "dist_m": 17803, "ride_min": 65.5, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:SSRN Hospital Bus Stand", "line": "101", "operator": "IO", "dist_m": 2554, "ride_min": 9.4, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "102", "operator": "NTC", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "102", "operator": "NTC", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:La Gare Phoenix Bus Stop", "line": "102", "operator": "NTC", "dist_m": 5217, "ride_min": 19.2, "mountainous": false}, {"a": "bus:La Gare Phoenix Bus Stop", "b": "metro:Floreal", "line": "102", "operator": "NTC", "dist_m": 2753, "ride_min": 10.1, "mountainous": false}, {"a": "metro:Floreal", "b": "bus:Jan Palach Square - Bus Station", "line": "102", "operator": "NTC", "dist_m": 2218, "ride_min": 8.2, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:St. Pierre Traffic Centre", "line": "103", "operator": "IO", "dist_m": 8214, "ride_min": 30.2, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Reduit Bus Station", "line": "105", "operator": "IO", "dist_m": 2613, "ride_min": 9.6, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Helvetia (Les Promenades)", "line": "105", "operator": "IO", "dist_m": 2872, "ride_min": 10.6, "mountainous": false}, {"a": "bus:Helvetia (Les Promenades)", "b": "bus:St. Pierre Traffic Centre", "line": "105", "operator": "IO", "dist_m": 1545, "ride_min": 5.7, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "106", "operator": "IO", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Botanical Garden Bus Stop", "line": "106", "operator": "IO", "dist_m": 7268, "ride_min": 26.8, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:Flacq Bus Station", "line": "106", "operator": "IO", "dist_m": 17803, "ride_min": 65.5, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "109", "operator": "IO", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Botanical Garden Bus Stop", "line": "109", "operator": "IO", "dist_m": 7268, "ride_min": 26.8, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:Flacq Bus Station", "line": "109", "operator": "IO", "dist_m": 17803, "ride_min": 65.5, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "110", "operator": "IO", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "111", "operator": "IO", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Botanical Garden Bus Stop", "line": "111", "operator": "IO", "dist_m": 7268, "ride_min": 26.8, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:Flacq Bus Station", "line": "111", "operator": "IO", "dist_m": 17803, "ride_min": 65.5, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "112", "operator": "IO", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Botanical Garden Bus Stop", "line": "112", "operator": "IO", "dist_m": 7268, "ride_min": 26.8, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:Flacq Bus Station", "line": "112", "operator": "IO", "dist_m": 17803, "ride_min": 65.5, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Reduit Bus Station", "line": "113", "operator": "IO", "dist_m": 7710, "ride_min": 28.4, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Helvetia (Les Promenades)", "line": "113", "operator": "IO", "dist_m": 2872, "ride_min": 10.6, "mountainous": false}, {"a": "bus:Helvetia (Les Promenades)", "b": "bus:St. Pierre Traffic Centre", "line": "113", "operator": "IO", "dist_m": 1545, "ride_min": 5.7, "mountainous": false}, {"a": "bus:St. Pierre Traffic Centre", "b": "bus:Quartier-Militaire Bus Station", "line": "113", "operator": "IO", "dist_m": 6662, "ride_min": 24.5, "mountainous": false}, {"a": "bus:Plaine Verte Bus Stop", "b": "bus:Vallijee Bus Station", "line": "115", "operator": "UBS", "dist_m": 3330, "ride_min": 12.3, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "117", "operator": "IO", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Bambous Bus Terminal", "line": "119", "operator": "NTC", "dist_m": 15329, "ride_min": 56.4, "mountainous": false}, {"a": "bus:Bambous Bus Terminal", "b": "bus:Bus stop Tamarin (sud)", "line": "119", "operator": "NTC", "dist_m": 8864, "ride_min": 32.6, "mountainous": false}, {"a": "bus:Bus stop Tamarin (sud)", "b": "bus:Bus stop Grande Riviere Noire", "line": "119", "operator": "NTC", "dist_m": 3303, "ride_min": 12.2, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Bambous Bus Terminal", "line": "120", "operator": "IO", "dist_m": 14462, "ride_min": 53.2, "mountainous": false}, {"a": "bus:Bambous Bus Terminal", "b": "bus:Bus stop Tamarin (sud)", "line": "120", "operator": "IO", "dist_m": 8864, "ride_min": 32.6, "mountainous": false}, {"a": "bus:Bus stop Tamarin (sud)", "b": "bus:Bus stop Grande Riviere Noire", "line": "120", "operator": "IO", "dist_m": 3303, "ride_min": 12.2, "mountainous": false}, {"a": "bus:Bus stop Grande Riviere Noire", "b": "bus:Bus stop Le Morne", "line": "120", "operator": "IO", "dist_m": 9961, "ride_min": 36.7, "mountainous": false}, {"a": "bus:Bus stop Le Morne", "b": "bus:Choisy/Baie du Cap Bus Station", "line": "120", "operator": "IO", "dist_m": 6059, "ride_min": 22.3, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "metro:Floreal", "line": "122", "operator": "NTC", "dist_m": 2218, "ride_min": 8.2, "mountainous": false}, {"a": "metro:Floreal", "b": "bus:Vacoas Bus Station", "line": "122", "operator": "NTC", "dist_m": 1987, "ride_min": 7.3, "mountainous": false}, {"a": "bus:Vacoas Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "122", "operator": "NTC", "dist_m": 2545, "ride_min": 9.4, "mountainous": false}, {"a": "bus:Candos (Victoria Hospital)", "b": "bus:Quatre Bornes Bus Station", "line": "122", "operator": "NTC", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Bambous Bus Terminal", "line": "123", "operator": "NTC/IO", "dist_m": 15329, "ride_min": 56.4, "mountainous": false}, {"a": "bus:Bambous Bus Terminal", "b": "bus:Wolmar Traffic Centre", "line": "123", "operator": "NTC/IO", "dist_m": 6575, "ride_min": 24.2, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "metro:Floreal", "line": "125", "operator": "NTC", "dist_m": 2218, "ride_min": 8.2, "mountainous": false}, {"a": "metro:Floreal", "b": "bus:Vacoas Bus Station", "line": "125", "operator": "NTC", "dist_m": 1987, "ride_min": 7.3, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "126", "operator": "NTC", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Botanical Garden Bus Stop", "line": "126", "operator": "NTC", "dist_m": 7268, "ride_min": 26.8, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:Bus stop Poudre d'Or", "line": "126", "operator": "NTC", "dist_m": 11142, "ride_min": 41.0, "mountainous": false}, {"a": "bus:Bus stop Poudre d'Or", "b": "bus:Riviere Du Rempart Bus Terminal", "line": "126", "operator": "NTC", "dist_m": 4864, "ride_min": 17.9, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "127", "operator": "NTC", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Botanical Garden Bus Stop", "line": "127", "operator": "NTC", "dist_m": 7268, "ride_min": 26.8, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:Riviere Du Rempart Bus Terminal", "line": "127", "operator": "NTC", "dist_m": 12179, "ride_min": 44.8, "mountainous": false}, {"a": "bus:Jan Palach Sud - Bus Station", "b": "bus:Nouvelle France (bus stop)", "line": "129", "operator": "NTC", "dist_m": 8560, "ride_min": 31.5, "mountainous": false}, {"a": "bus:Nouvelle France (bus stop)", "b": "bus:Souillac Bus Terminal", "line": "129", "operator": "NTC", "dist_m": 15562, "ride_min": 57.3, "mountainous": false}, {"a": "bus:Souillac Bus Terminal", "b": "bus:Bus stop Chemin Grenier (FFX6)", "line": "129", "operator": "NTC", "dist_m": 6704, "ride_min": 24.7, "mountainous": false}, {"a": "bus:Jan Palach Sud - Bus Station", "b": "bus:Nouvelle France (bus stop)", "line": "133", "operator": "NTC", "dist_m": 8560, "ride_min": 31.5, "mountainous": false}, {"a": "bus:Nouvelle France (bus stop)", "b": "bus:Souillac Bus Terminal", "line": "133", "operator": "NTC", "dist_m": 15562, "ride_min": 57.3, "mountainous": false}, {"a": "bus:Souillac Bus Terminal", "b": "bus:Bus stop Chemin Grenier (FFX6)", "line": "133", "operator": "NTC", "dist_m": 6704, "ride_min": 24.7, "mountainous": false}, {"a": "bus:Bus stop Chemin Grenier (FFX6)", "b": "bus:Choisy/Baie du Cap Bus Station", "line": "133", "operator": "NTC", "dist_m": 8588, "ride_min": 31.6, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "metro:Floreal", "line": "134", "operator": "NTC", "dist_m": 2218, "ride_min": 8.2, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:St. Pierre Traffic Centre", "line": "135", "operator": "IO", "dist_m": 8214, "ride_min": 30.2, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "140", "operator": "UBS", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "140", "operator": "UBS", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:La Gare Phoenix Bus Stop", "line": "140", "operator": "UBS", "dist_m": 5217, "ride_min": 19.2, "mountainous": false}, {"a": "bus:La Gare Phoenix Bus Stop", "b": "bus:Hermitage Bus Station", "line": "140", "operator": "UBS", "dist_m": 4424, "ride_min": 16.3, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Reduit Bus Station", "line": "141", "operator": "NTC", "dist_m": 7710, "ride_min": 28.4, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:La Gare Phoenix Bus Stop", "line": "141", "operator": "NTC", "dist_m": 5746, "ride_min": 21.2, "mountainous": false}, {"a": "bus:La Gare Phoenix Bus Stop", "b": "bus:Vacoas Bus Station", "line": "141", "operator": "NTC", "dist_m": 1349, "ride_min": 5.0, "mountainous": false}, {"a": "bus:Vacoas Bus Station", "b": "metro:Floreal", "line": "143", "operator": "NTC", "dist_m": 1987, "ride_min": 7.3, "mountainous": false}, {"a": "metro:Floreal", "b": "bus:Jan Palach Square - Bus Station", "line": "143", "operator": "NTC", "dist_m": 2218, "ride_min": 8.2, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "145", "operator": "RHT", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Quatre Bornes Bus Station", "line": "147", "operator": "NTC", "dist_m": 2628, "ride_min": 9.7, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "147", "operator": "NTC", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Cite La Cure Bus Terminal", "b": "bus:Plaine Verte Bus Stop", "line": "148", "operator": "UBS", "dist_m": 2339, "ride_min": 8.6, "mountainous": false}, {"a": "bus:Plaine Verte Bus Stop", "b": "bus:Vallijee Bus Station", "line": "148", "operator": "UBS", "dist_m": 3330, "ride_min": 12.3, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "149", "operator": "UBS", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "149", "operator": "UBS", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:La Gare Phoenix Bus Stop", "line": "149", "operator": "UBS", "dist_m": 5217, "ride_min": 19.2, "mountainous": false}, {"a": "bus:La Gare Phoenix Bus Stop", "b": "bus:Jan Palach Square - Bus Station", "line": "149", "operator": "UBS", "dist_m": 4648, "ride_min": 17.1, "mountainous": false}, {"a": "bus:Vallijee Bus Station", "b": "bus:Plaine Verte Bus Stop", "line": "152", "operator": "UBS", "dist_m": 3330, "ride_min": 12.3, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "metro:Floreal", "line": "153", "operator": "NTC", "dist_m": 2218, "ride_min": 8.2, "mountainous": false}, {"a": "metro:Floreal", "b": "bus:Vacoas Bus Station", "line": "153", "operator": "NTC", "dist_m": 1987, "ride_min": 7.3, "mountainous": false}, {"a": "bus:Vacoas Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "153", "operator": "NTC", "dist_m": 2545, "ride_min": 9.4, "mountainous": false}, {"a": "bus:Candos (Victoria Hospital)", "b": "bus:Quatre Bornes Bus Station", "line": "153", "operator": "NTC", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Reduit Bus Station", "line": "153", "operator": "NTC", "dist_m": 4252, "ride_min": 15.7, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Helvetia (Les Promenades)", "line": "153", "operator": "NTC", "dist_m": 2872, "ride_min": 10.6, "mountainous": false}, {"a": "bus:Helvetia (Les Promenades)", "b": "bus:St. Pierre Traffic Centre", "line": "153", "operator": "NTC", "dist_m": 1545, "ride_min": 5.7, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "155", "operator": "NTC", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Candos (Victoria Hospital)", "b": "bus:Jan Palach Sud - Bus Station", "line": "155", "operator": "NTC", "dist_m": 6797, "ride_min": 25.0, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "156", "operator": "NTC", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "156", "operator": "NTC", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "159", "operator": "IO", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:SSRN Hospital Bus Stand", "line": "159", "operator": "IO", "dist_m": 6104, "ride_min": 22.5, "mountainous": false}, {"a": "bus:Vallijee Bus Station", "b": "bus:Plaine Verte Bus Stop", "line": "160", "operator": "UBS", "dist_m": 3330, "ride_min": 12.3, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Reduit Bus Station", "line": "162", "operator": "UBS", "dist_m": 7710, "ride_min": 28.4, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:La Gare Phoenix Bus Stop", "line": "162", "operator": "UBS", "dist_m": 5746, "ride_min": 21.2, "mountainous": false}, {"a": "bus:La Gare Phoenix Bus Stop", "b": "bus:Jan Palach Square - Bus Station", "line": "162", "operator": "UBS", "dist_m": 4648, "ride_min": 17.1, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Reduit Bus Station", "line": "163", "operator": "NTC", "dist_m": 7710, "ride_min": 28.4, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Quatre Bornes Bus Station", "line": "163", "operator": "NTC", "dist_m": 4252, "ride_min": 15.7, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "163", "operator": "NTC", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Candos (Victoria Hospital)", "b": "bus:Vacoas Bus Station", "line": "163", "operator": "NTC", "dist_m": 2545, "ride_min": 9.4, "mountainous": false}, {"a": "bus:Jan Palach Sud - Bus Station", "b": "bus:Nouvelle France (bus stop)", "line": "168", "operator": "NTC", "dist_m": 8560, "ride_min": 31.5, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "170", "operator": "NTC", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "170", "operator": "NTC", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Quatre Bornes Bus Station", "line": "170", "operator": "NTC", "dist_m": 2628, "ride_min": 9.7, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "170", "operator": "NTC", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Candos (Victoria Hospital)", "b": "bus:Vacoas Bus Station", "line": "170", "operator": "NTC", "dist_m": 2545, "ride_min": 9.4, "mountainous": false}, {"a": "bus:Vacoas Bus Station", "b": "bus:Jan Palach Square - Bus Station", "line": "170", "operator": "NTC", "dist_m": 4172, "ride_min": 15.4, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "171", "operator": "TBS", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:SSRN Hospital Bus Stand", "line": "171", "operator": "TBS", "dist_m": 6104, "ride_min": 22.5, "mountainous": false}, {"a": "bus:SSRN Hospital Bus Stand", "b": "bus:Triolet Bus Service Ltd Terminus", "line": "171", "operator": "TBS", "dist_m": 5806, "ride_min": 21.4, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "bus:La Gare Phoenix Bus Stop", "line": "173", "operator": "UBS", "dist_m": 4648, "ride_min": 17.1, "mountainous": false}, {"a": "bus:La Gare Phoenix Bus Stop", "b": "bus:Reduit Bus Station", "line": "173", "operator": "UBS", "dist_m": 5746, "ride_min": 21.2, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Helvetia (Les Promenades)", "line": "173", "operator": "UBS", "dist_m": 2872, "ride_min": 10.6, "mountainous": false}, {"a": "bus:Helvetia (Les Promenades)", "b": "bus:St. Pierre Traffic Centre", "line": "173", "operator": "UBS", "dist_m": 1545, "ride_min": 5.7, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "metro:Ebene", "line": "174", "operator": "RHT", "dist_m": 1257, "ride_min": 4.6, "mountainous": false}, {"a": "metro:Ebene", "b": "bus:Reduit Bus Station", "line": "174", "operator": "RHT", "dist_m": 1518, "ride_min": 5.6, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Place Victoria Bus Terminal", "line": "174", "operator": "RHT", "dist_m": 7710, "ride_min": 28.4, "mountainous": false}, {"a": "bus:SSRN Hospital Bus Stand", "b": "bus:Botanical Garden Bus Stop", "line": "175", "operator": "MBT", "dist_m": 2554, "ride_min": 9.4, "mountainous": false}, {"a": "bus:Botanical Garden Bus Stop", "b": "bus:Creve Coeur Bus Station (Terminus)", "line": "175", "operator": "MBT", "dist_m": 10011, "ride_min": 36.9, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "176", "operator": "NTC", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Terre Rouge (bus stop)", "b": "bus:Flacq Bus Station", "line": "176", "operator": "NTC", "dist_m": 21590, "ride_min": 79.5, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "bus:Vacoas Bus Station", "line": "179", "operator": "NTC", "dist_m": 4172, "ride_min": 15.4, "mountainous": false}, {"a": "bus:Vacoas Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "179", "operator": "NTC", "dist_m": 2545, "ride_min": 9.4, "mountainous": false}, {"a": "bus:Candos (Victoria Hospital)", "b": "bus:Beaux Songes Bus Terminal", "line": "179", "operator": "NTC", "dist_m": 5523, "ride_min": 20.3, "mountainous": false}, {"a": "bus:Beaux Songes Bus Terminal", "b": "bus:Bambous Bus Terminal", "line": "179", "operator": "NTC", "dist_m": 2490, "ride_min": 9.2, "mountainous": false}, {"a": "bus:Bambous Bus Terminal", "b": "bus:Flic en Flac Bus Terminus", "line": "179", "operator": "NTC", "dist_m": 6559, "ride_min": 24.2, "mountainous": false}, {"a": "bus:Flic en Flac Bus Terminus", "b": "bus:Wolmar Traffic Centre", "line": "179", "operator": "NTC", "dist_m": 20, "ride_min": 0.1, "mountainous": false}, {"a": "bus:Cite La Cure Bus Terminal", "b": "bus:Plaine Verte Bus Stop", "line": "182", "operator": "IO", "dist_m": 2339, "ride_min": 8.6, "mountainous": false}, {"a": "bus:Plaine Verte Bus Stop", "b": "bus:Coromandel (tram/bus)", "line": "182", "operator": "IO", "dist_m": 5246, "ride_min": 19.3, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "185", "operator": "IO", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Reduit Bus Station", "line": "188", "operator": "NTC", "dist_m": 7710, "ride_min": 28.4, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Quatre Bornes Bus Station", "line": "188", "operator": "NTC", "dist_m": 4252, "ride_min": 15.7, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Bambous Bus Terminal", "line": "189", "operator": "NTC", "dist_m": 7290, "ride_min": 42.2, "mountainous": true}, {"a": "bus:Bambous Bus Terminal", "b": "bus:Flic en Flac Bus Terminus", "line": "189", "operator": "NTC", "dist_m": 6559, "ride_min": 24.2, "mountainous": false}, {"a": "bus:Flic en Flac Bus Terminus", "b": "bus:Wolmar Traffic Centre", "line": "189", "operator": "NTC", "dist_m": 20, "ride_min": 0.1, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Immigration Square", "line": "190", "operator": "NTC", "dist_m": 887, "ride_min": 3.3, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Jan Palach Square - Bus Station", "line": "191", "operator": "UBS", "dist_m": 17777, "ride_min": 65.5, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Vacoas Bus Station", "line": "192", "operator": "NTC", "dist_m": 14707, "ride_min": 54.1, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "bus:La Gare Phoenix Bus Stop", "line": "193", "operator": "UBS", "dist_m": 4648, "ride_min": 17.1, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:La Gare Phoenix Bus Stop", "line": "195", "operator": "NTC", "dist_m": 2909, "ride_min": 10.7, "mountainous": false}, {"a": "bus:La Gare Phoenix Bus Stop", "b": "bus:Quatre Bornes Bus Station", "line": "195", "operator": "NTC", "dist_m": 2909, "ride_min": 10.7, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Reduit Bus Station", "line": "197", "operator": "NTC", "dist_m": 7710, "ride_min": 28.4, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Nouvelle France (bus stop)", "line": "197", "operator": "NTC", "dist_m": 18370, "ride_min": 67.6, "mountainous": false}, {"a": "bus:Nouvelle France (bus stop)", "b": "bus:Souillac Bus Terminal", "line": "197", "operator": "NTC", "dist_m": 15562, "ride_min": 57.3, "mountainous": false}, {"a": "bus:Souillac Bus Terminal", "b": "bus:Bus stop Chemin Grenier (FFX6)", "line": "197", "operator": "NTC", "dist_m": 6704, "ride_min": 24.7, "mountainous": false}, {"a": "bus:Bus stop Chemin Grenier (FFX6)", "b": "bus:Riviere Des Gallets Bus Station", "line": "197", "operator": "NTC", "dist_m": 623, "ride_min": 2.3, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Reduit Bus Station", "line": "198", "operator": "UBS/IO", "dist_m": 7710, "ride_min": 28.4, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Rose Belle Bus Terminal", "line": "198", "operator": "UBS/IO", "dist_m": 21598, "ride_min": 79.5, "mountainous": false}, {"a": "bus:Rose Belle Bus Terminal", "b": "poi:Aéroport SSR (Plaine Magnien)", "line": "198", "operator": "UBS/IO", "dist_m": 9211, "ride_min": 33.9, "mountainous": false}, {"a": "poi:Aéroport SSR (Plaine Magnien)", "b": "bus:Mahebourg Bus Terminal", "line": "198", "operator": "UBS/IO", "dist_m": 4339, "ride_min": 16.0, "mountainous": false}, {"a": "bus:Immigration Square", "b": "bus:Terre Rouge (bus stop)", "line": "199", "operator": "TBS", "dist_m": 2989, "ride_min": 11.0, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Reduit Bus Station", "line": "200", "operator": "IO", "dist_m": 7710, "ride_min": 28.4, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Rose Belle Bus Terminal", "line": "200", "operator": "IO", "dist_m": 21598, "ride_min": 79.5, "mountainous": false}, {"a": "bus:Hermitage Bus Station", "b": "bus:Vacoas Bus Station", "line": "202", "operator": "UBS", "dist_m": 5336, "ride_min": 19.6, "mountainous": false}, {"a": "poi:Aéroport SSR (Plaine Magnien)", "b": "bus:Mahebourg Bus Terminal", "line": "214", "operator": "IO", "dist_m": 4339, "ride_min": 16.0, "mountainous": false}, {"a": "bus:Flacq Bus Station", "b": "bus:Hermitage Bus Station", "line": "217", "operator": "IO", "dist_m": 21554, "ride_min": 79.4, "mountainous": false}, {"a": "bus:Hermitage Bus Station", "b": "bus:Flacq Bus Station", "line": "217", "operator": "IO", "dist_m": 21554, "ride_min": 79.4, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "bus:La Gare Phoenix Bus Stop", "line": "219", "operator": "NTC", "dist_m": 4648, "ride_min": 17.1, "mountainous": false}, {"a": "bus:La Gare Phoenix Bus Stop", "b": "bus:Candos (Victoria Hospital)", "line": "219", "operator": "NTC", "dist_m": 2336, "ride_min": 8.6, "mountainous": false}, {"a": "bus:Candos (Victoria Hospital)", "b": "bus:Quatre Bornes Bus Station", "line": "219", "operator": "NTC", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Riviere Du Rempart Bus Terminal", "b": "bus:Flacq Bus Station", "line": "221", "operator": "NTC", "dist_m": 9911, "ride_min": 36.5, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Reduit Bus Station", "line": "222", "operator": "NTC", "dist_m": 2613, "ride_min": 9.6, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Helvetia (Les Promenades)", "line": "222", "operator": "NTC", "dist_m": 2872, "ride_min": 10.6, "mountainous": false}, {"a": "bus:Helvetia (Les Promenades)", "b": "bus:St. Pierre Traffic Centre", "line": "222", "operator": "NTC", "dist_m": 1545, "ride_min": 5.7, "mountainous": false}, {"a": "bus:St. Pierre Traffic Centre", "b": "bus:Quartier-Militaire Bus Station", "line": "222", "operator": "NTC", "dist_m": 6662, "ride_min": 24.5, "mountainous": false}, {"a": "bus:Quartier-Militaire Bus Station", "b": "bus:Riviere Du Rempart Bus Terminal", "line": "222", "operator": "NTC", "dist_m": 19015, "ride_min": 70.0, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "bus:Quartier-Militaire Bus Station", "line": "226", "operator": "NTC", "dist_m": 10887, "ride_min": 40.1, "mountainous": false}, {"a": "bus:Quartier-Militaire Bus Station", "b": "bus:Riviere Du Rempart Bus Terminal", "line": "226", "operator": "NTC", "dist_m": 19015, "ride_min": 70.0, "mountainous": false}, {"a": "bus:Bus stop Grand Baie MCB", "b": "bus:Bus Station Pereybere (Royal Rd)", "line": "228", "operator": "TBS", "dist_m": 2064, "ride_min": 7.6, "mountainous": false}, {"a": "bus:Bus Station Pereybere (Royal Rd)", "b": "bus:Goodlands Bus Station", "line": "228", "operator": "TBS", "dist_m": 8381, "ride_min": 30.9, "mountainous": false}, {"a": "bus:Bus stop Grand Baie MCB", "b": "bus:Goodlands Bus Station", "line": "231", "operator": "TBS", "dist_m": 7933, "ride_min": 29.2, "mountainous": false}, {"a": "bus:Riviere Du Rempart Bus Terminal", "b": "bus:Flacq Bus Station", "line": "240", "operator": "IO", "dist_m": 9911, "ride_min": 36.5, "mountainous": false}, {"a": "bus:Vacoas Bus Station", "b": "bus:La Gare Phoenix Bus Stop", "line": "241", "operator": "NTC", "dist_m": 1349, "ride_min": 5.0, "mountainous": false}, {"a": "bus:La Gare Phoenix Bus Stop", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "241", "operator": "NTC", "dist_m": 5217, "ride_min": 19.2, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "242", "operator": "NTC", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Place Jean Cardinal Margeot Bus Station", "b": "bus:Quatre Bornes Bus Station", "line": "242", "operator": "NTC", "dist_m": 2628, "ride_min": 9.7, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "242", "operator": "NTC", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Quatre Bornes Bus Station", "b": "bus:Beaux Songes Bus Terminal", "line": "243", "operator": "IO", "dist_m": 5984, "ride_min": 22.0, "mountainous": false}, {"a": "bus:Beaux Songes Bus Terminal", "b": "bus:Bambous Bus Terminal", "line": "243", "operator": "IO", "dist_m": 2490, "ride_min": 9.2, "mountainous": false}, {"a": "bus:Bambous Bus Terminal", "b": "bus:Bus stop Riviere Noire (centre)", "line": "243", "operator": "IO", "dist_m": 11184, "ride_min": 41.2, "mountainous": false}, {"a": "bus:Bus stop Riviere Noire (centre)", "b": "bus:Bus stop Case Noyale (nord)", "line": "243", "operator": "IO", "dist_m": 4153, "ride_min": 15.3, "mountainous": false}, {"a": "bus:Bus stop Case Noyale (nord)", "b": "bus:Bus 243 Last Stop (Chamarel)", "line": "243", "operator": "IO", "dist_m": 5199, "ride_min": 19.1, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Reduit Bus Station", "line": "245", "operator": "NTC", "dist_m": 7710, "ride_min": 28.4, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Nouvelle France (bus stop)", "line": "245", "operator": "NTC", "dist_m": 18370, "ride_min": 67.6, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Reduit Bus Station", "line": "246", "operator": "NTC", "dist_m": 7710, "ride_min": 28.4, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Nouvelle France (bus stop)", "line": "246", "operator": "NTC", "dist_m": 18370, "ride_min": 67.6, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Reduit Bus Station", "line": "248", "operator": "UBS", "dist_m": 7710, "ride_min": 28.4, "mountainous": false}, {"a": "bus:Reduit Bus Station", "b": "bus:Rose Belle Bus Terminal", "line": "248", "operator": "UBS", "dist_m": 21598, "ride_min": 79.5, "mountainous": false}, {"a": "bus:Hermitage Bus Station", "b": "bus:La Gare Phoenix Bus Stop", "line": "249", "operator": "UBS", "dist_m": 4424, "ride_min": 16.3, "mountainous": false}, {"a": "bus:La Gare Phoenix Bus Stop", "b": "bus:Vacoas Bus Station", "line": "249", "operator": "UBS", "dist_m": 1349, "ride_min": 5.0, "mountainous": false}, {"a": "bus:Vacoas Bus Station", "b": "bus:Candos (Victoria Hospital)", "line": "249", "operator": "UBS", "dist_m": 2545, "ride_min": 9.4, "mountainous": false}, {"a": "bus:Candos (Victoria Hospital)", "b": "bus:Quatre Bornes Bus Station", "line": "249", "operator": "UBS", "dist_m": 1445, "ride_min": 5.3, "mountainous": false}, {"a": "bus:Place Victoria Bus Terminal", "b": "bus:Coromandel (tram/bus)", "line": "250", "operator": "UBS", "dist_m": 3773, "ride_min": 13.9, "mountainous": false}, {"a": "bus:Coromandel (tram/bus)", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "250", "operator": "UBS", "dist_m": 6508, "ride_min": 24.0, "mountainous": false}, {"a": "bus:Vallijee Bus Station", "b": "bus:Plaine Verte Bus Stop", "line": "253", "operator": "UBS", "dist_m": 3330, "ride_min": 12.3, "mountainous": false}, {"a": "bus:Plaine Verte Bus Stop", "b": "bus:Riche Terre Bus Terminal", "line": "253", "operator": "UBS", "dist_m": 3336, "ride_min": 12.3, "mountainous": false}, {"a": "bus:Jan Palach Square - Bus Station", "b": "bus:La Gare Phoenix Bus Stop", "line": "254", "operator": "UBS", "dist_m": 4648, "ride_min": 17.1, "mountainous": false}, {"a": "bus:La Gare Phoenix Bus Stop", "b": "bus:Trianon Bus Stop", "line": "254", "operator": "UBS", "dist_m": 2830, "ride_min": 10.4, "mountainous": false}, {"a": "bus:Trianon Bus Stop", "b": "metro:Ebene", "line": "254", "operator": "UBS", "dist_m": 2049, "ride_min": 7.5, "mountainous": false}, {"a": "metro:Ebene", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "254", "operator": "UBS", "dist_m": 1257, "ride_min": 4.6, "mountainous": false}, {"a": "bus:Vacoas Bus Station", "b": "metro:Ebene", "line": "255", "operator": "NTC", "dist_m": 5996, "ride_min": 22.1, "mountainous": false}, {"a": "metro:Ebene", "b": "bus:Place Jean Cardinal Margeot Bus Station", "line": "255", "operator": "NTC", "dist_m": 1257, "ride_min": 4.6, "mountainous": false}], "landmarks": [{"name": "Sofitel Mauritius L'Impérial Resort & Spa", "category": "Hôtel", "lat": -20.311618, "lon": 57.367501, "area": "Wolmar, Flic en Flac"}, {"name": "C-Care Wellkin Hospital (Moka)", "category": "Hôpital", "lat": -20.2332022, "lon": 57.5039795, "area": "Moka"}, {"name": "C-Care Clinique Darné (Curepipe)", "category": "Clinique", "lat": -20.3127959, "lon": 57.5167395, "area": "Floréal, Curepipe"}, {"name": "C-Care Grand Baie", "category": "Clinique", "lat": -20.0238727, "lon": 57.5759414, "area": "Smart City, Grand Baie"}, {"name": "C-Care Clinique Tamarin", "category": "Clinique", "lat": -20.3478991, "lon": 57.3646064, "area": "District 1, Tamarin"}, {"name": "Aéroport SSR (Plaine Magnien)", "category": "Aéroport", "lat": -20.4334615, "lon": 57.6787266, "area": "Plaine Magnien"}, {"name": "Université de Maurice", "category": "Université", "lat": -20.2349416, "lon": 57.4962994, "area": "Réduit, Moka"}, {"name": "Bagatelle Mall", "category": "Centre commercial", "lat": -20.2254142, "lon": 57.4967967, "area": "Bagatelle, Moka"}, {"name": "Caudan Waterfront", "category": "Centre commercial", "lat": -20.160863, "lon": 57.498089, "area": "Port Louis"}, {"name": "Trianon Shopping Park", "category": "Centre commercial", "lat": -20.2589344, "lon": 57.4897711, "area": "Quatre Bornes"}, {"name": "La Croisette", "category": "Centre commercial", "lat": -20.0219739, "lon": 57.5787883, "area": "Grand Baie"}]}
+</script>
+<script>
+(function(){
+  "use strict";
+  var DATA = JSON.parse(document.getElementById('transit-data').textContent);
+
+  // ================= Graph engine (unchanged logic) =================
+  var nodes = {};
+  var adj = {};
+
+  function addNode(id, name, type, area, lat, lon){
+    if(!nodes[id]) nodes[id] = {id:id, name:name, type:type, area:area, lat:lat, lon:lon};
+    if(!adj[id]) adj[id] = [];
+  }
+  function addEdge(a, b, mode, line, weight){
+    adj[a].push({to:b, mode:mode, line:line||null, weight:weight});
+    adj[b].push({to:a, mode:mode, line:line||null, weight:weight});
+  }
+
+  DATA.busStops.forEach(function(s){ addNode('bus:'+s.name, s.name, 'bus', s.region+' · '+s.locality, s.lat, s.lon); });
+  DATA.metroStations.forEach(function(s){ addNode('metro:'+s.name, s.name, 'metro', 'Metro Express · '+s.city, s.lat, s.lon); });
+  (DATA.landmarks||[]).forEach(function(s){ addNode('poi:'+s.name, s.name, 'poi', s.category+' · '+s.area, s.lat, s.lon); });
+
+  DATA.walkBB.forEach(function(p){
+    var a='bus:'+p.a, b='bus:'+p.b;
+    if(nodes[a] && nodes[b]) addEdge(a,b,'walk',null,p.walk_min);
+  });
+  DATA.metroBus.forEach(function(p){
+    var a='metro:'+p.metro, b='bus:'+p.bus;
+    if(nodes[a] && nodes[b]) addEdge(a,b,'walk',null,p.walk_min);
+  });
+  DATA.busLines.forEach(function(p){
+    var a=p.a, b=p.b;
+    if(nodes[a] && nodes[b]) addEdge(a,b,'bus',p.line,p.ride_min);
+  });
+  var metroSorted = DATA.metroStations.slice().sort(function(a,b){return a.order-b.order;});
+  for(var i=0;i<metroSorted.length-1;i++){
+    addEdge('metro:'+metroSorted[i].name,'metro:'+metroSorted[i+1].name,'metro','Metro Express', 2.3);
+  }
+
+  var WALK_SPEED_M_MIN = 83.3, DETOUR_FACTOR = 1.3;
+  function haversineM(lat1, lon1, lat2, lon2){
+    var R = 6371000, toRad = Math.PI/180;
+    var p1 = lat1*toRad, p2 = lat2*toRad;
+    var dphi = (lat2-lat1)*toRad, dl = (lon2-lon1)*toRad;
+    var a = Math.sin(dphi/2)*Math.sin(dphi/2) + Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)*Math.sin(dl/2);
+    return 2*R*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+  // Connects any extra point (a landmark, or the user's live position) to the
+  // nearest few network nodes by walking distance — same mechanism for both.
+  function connectExtraNode(nodeId, lat, lon, radius){
+    var candidates = [];
+    Object.keys(nodes).forEach(function(id){
+      if(id === nodeId || nodes[id].type === 'poi' || nodes[id].type === 'geo') return;
+      var n = nodes[id];
+      candidates.push({id:id, d: haversineM(lat, lon, n.lat, n.lon)});
+    });
+    candidates.sort(function(a,b){return a.d-b.d;});
+    var picked = candidates.filter(function(c){return c.d<=(radius||1600);}).slice(0,3);
+    if(picked.length===0 && candidates.length) picked = [candidates[0]];
+    picked.forEach(function(c){
+      addEdge(nodeId, c.id, 'walk', null, (c.d*DETOUR_FACTOR)/WALK_SPEED_M_MIN);
+    });
+  }
+  (DATA.landmarks||[]).forEach(function(lm){
+    var poiId = 'poi:'+lm.name;
+    connectExtraNode(poiId, lm.lat, lm.lon, 1600);
+  });
+
+  var WAIT_BUS = 8, WAIT_METRO = 5;
+  function modeKey(mode, line){ return mode==='walk' ? 'walk' : (mode+'|'+(line||'')); }
+
+  function shortestPath(startId, endId){
+    if(!nodes[startId] || !nodes[endId]) return null;
+    var startState = startId+'::start';
+    var dist = {}; dist[startState] = 0;
+    var prev = {};
+    var visited = {};
+    var queue = [{state:startState, node:startId, mk:'start', d:0}];
+    function popMin(){
+      var bi=0;
+      for(var i=1;i<queue.length;i++) if(queue[i].d < queue[bi].d) bi=i;
+      return queue.splice(bi,1)[0];
+    }
+    while(queue.length){
+      var cur = popMin();
+      if(visited[cur.state]) continue;
+      visited[cur.state] = true;
+      if(cur.node === endId) return reconstruct(cur.state, prev, dist);
+      var edges = adj[cur.node] || [];
+      for(var i=0;i<edges.length;i++){
+        var e = edges[i];
+        if(e.mode === 'walk' && cur.mk === 'walk') continue;
+        var eMk = modeKey(e.mode, e.line);
+        var boarding = 0;
+        if(e.mode !== 'walk' && eMk !== cur.mk){ boarding = (e.mode==='metro' ? WAIT_METRO : WAIT_BUS); }
+        var nd = cur.d + e.weight + boarding;
+        var nState = e.to+'::'+eMk;
+        if(dist[nState] === undefined || nd < dist[nState]){
+          dist[nState] = nd;
+          prev[nState] = {from: cur.state, edge: e, boarding: boarding};
+          queue.push({state:nState, node:e.to, mk:eMk, d:nd});
+        }
+      }
+    }
+    return null;
+  }
+  function reconstruct(finalState, prev, dist){
+    var chain = []; var s = finalState;
+    while(prev[s]){ chain.push({edge: prev[s].edge, boarding: prev[s].boarding}); s = prev[s].from; }
+    chain.reverse();
+    return {totalMin: dist[finalState], chain: chain};
+  }
+  function nearestAlternatives(fromId, limit){
+    var from = nodes[fromId];
+    var list = [];
+    Object.keys(nodes).forEach(function(id){
+      if(id === fromId) return;
+      var n = nodes[id];
+      list.push({id:id, d: haversineM(from.lat, from.lon, n.lat, n.lon)});
+    });
+    list.sort(function(a,b){return a.d-b.d;});
+    return list.slice(0, limit);
+  }
+  function routeWithFallback(oid, did){
+    var direct = shortestPath(oid, did);
+    if(direct) return {result:direct, actualStart:oid, actualEnd:did, startWalk:0, endWalk:0};
+    var CANDIDATES = 10;
+    var altOrigins = nearestAlternatives(oid, CANDIDATES);
+    var altDests = nearestAlternatives(did, CANDIDATES);
+    for(var i=0;i<altOrigins.length;i++){
+      var r = shortestPath(altOrigins[i].id, did);
+      if(r) return {result:r, actualStart:altOrigins[i].id, actualEnd:did, startWalk:(altOrigins[i].d*DETOUR_FACTOR)/WALK_SPEED_M_MIN, endWalk:0};
+    }
+    for(var j=0;j<altDests.length;j++){
+      var r2 = shortestPath(oid, altDests[j].id);
+      if(r2) return {result:r2, actualStart:oid, actualEnd:altDests[j].id, startWalk:0, endWalk:(altDests[j].d*DETOUR_FACTOR)/WALK_SPEED_M_MIN};
+    }
+    var best = null;
+    for(var i2=0;i2<Math.min(5,altOrigins.length);i2++){
+      for(var j2=0;j2<Math.min(5,altDests.length);j2++){
+        var r3 = shortestPath(altOrigins[i2].id, altDests[j2].id);
+        if(r3){
+          var wA = (altOrigins[i2].d*DETOUR_FACTOR)/WALK_SPEED_M_MIN;
+          var wB = (altDests[j2].d*DETOUR_FACTOR)/WALK_SPEED_M_MIN;
+          var total = r3.totalMin + wA + wB;
+          if(!best || total < best.total) best = {total:total, result:r3, actualStart:altOrigins[i2].id, actualEnd:altDests[j2].id, startWalk:wA, endWalk:wB};
+        }
+      }
+    }
+    return best;
+  }
+  function buildLegs(startId, result){
+    var legs = []; var curNode = startId; var curLeg = null;
+    result.chain.forEach(function(step){
+      var e = step.edge;
+      var mk = modeKey(e.mode, e.line);
+      if(curLeg && curLeg.mk === mk){
+        curLeg.to = e.to; curLeg.rideMin += e.weight; curLeg.stops += 1;
+      } else {
+        if(curLeg) legs.push(curLeg);
+        curLeg = {mode:e.mode, line:e.line, mk:mk, from:curNode, to:e.to, rideMin:e.weight, waitMin:step.boarding, stops:1};
+      }
+      curNode = e.to;
+    });
+    if(curLeg) legs.push(curLeg);
+    return legs;
+  }
+
+  // ================= Utilities =================
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
+  }
+  function fmtMin(m){
+    m = Math.round(m);
+    if(m < 60) return m+' min';
+    var h = Math.floor(m/60), r = m%60;
+    return h+'h'+(r? (r<10?'0':'')+r : '00');
+  }
+  function fmtDist(meters){
+    if(meters < 1000) return Math.round(meters)+' m';
+    return (meters/1000).toFixed(1)+' km';
+  }
+  function bearingDirection(lat1, lon1, lat2, lon2){
+    var toRad = Math.PI/180, toDeg = 180/Math.PI;
+    var dLon = (lon2-lon1)*toRad;
+    var y = Math.sin(dLon)*Math.cos(lat2*toRad);
+    var x = Math.cos(lat1*toRad)*Math.sin(lat2*toRad) - Math.sin(lat1*toRad)*Math.cos(lat2*toRad)*Math.cos(dLon);
+    var brng = (Math.atan2(y,x)*toDeg + 360) % 360;
+    var dirs = ['nord','nord-est','est','sud-est','sud','sud-ouest','ouest','nord-ouest'];
+    return dirs[Math.round(brng/45) % 8];
+  }
+  function walkDifficulty(meters){
+    if(meters <= 800) return 'Facile';
+    if(meters <= 1500) return 'Modérée';
+    return 'Longue';
+  }
+
+  var LEG_COLORS = ['#3B6FE0','#E8934D','#35B073','#8B5CF6','#E0527A','#14B8A6','#D9A62B'];
+  function legColor(idx){ return LEG_COLORS[idx % LEG_COLORS.length]; }
+
+  var ICONS = {
+    walk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="2"/><path d="M9 20l2-6-3-3 1-5 4 1 2 4 3 2M9 14l-3 6"/></svg>',
+    bus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="13" rx="2"/><path d="M4 12h16M8 21l1-2M16 21l-1-2"/></svg>',
+    metro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="14" rx="4"/><path d="M5 12h14M8 21l-1.5-2M16 21l1.5-2"/></svg>',
+    pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0119 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.2"/></svg>',
+    transfer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4M3 12v-2a4 4 0 014-4h14M7 22l-4-4 4-4M21 12v2a4 4 0 01-4 4H3"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>',
+    ruler: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l14-14 4 4-14 14H3v-4z"/><path d="M14 7l3 3M11 10l3 3M8 13l3 3"/></svg>',
+    gauge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15l3-4"/><circle cx="12" cy="15" r="1"/><path d="M4 15a8 8 0 1116 0"/></svg>',
+    warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>',
+    chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>'
+  };
+
+  // ================= Screen navigation =================
+  var screens = {
+    home: document.getElementById('screen-home'),
+    overview: document.getElementById('screen-overview'),
+    detail: document.getElementById('screen-detail')
+  };
+  function showScreen(name){
+    Object.keys(screens).forEach(function(k){ screens[k].classList.toggle('active', k===name); });
+    if(name === 'overview' && overviewMap) setTimeout(function(){ overviewMap.invalidateSize(); }, 50);
+    if(name === 'detail' && detailMap) setTimeout(function(){ detailMap.invalidateSize(); }, 50);
+    if(name === 'home' && homeMap) setTimeout(function(){ homeMap.invalidateSize(); }, 50);
+  }
+  document.getElementById('back-to-home').addEventListener('click', function(){ showScreen('home'); });
+  document.getElementById('back-to-overview').addEventListener('click', function(){ showScreen('overview'); });
+
+  // ================= Home map =================
+  var homeMap = L.map('home-map', {zoomControl:false, attributionControl:true});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {maxZoom:19, detectRetina:true}).addTo(homeMap);
+  homeMap.setView([-20.24, 57.55], 11);
+  var mapStatus = document.getElementById('map-status');
+  homeMap.whenReady(function(){ setTimeout(function(){ if(mapStatus) mapStatus.classList.add('hidden'); }, 900); });
+  document.getElementById('zoom-in').addEventListener('click', function(){ homeMap.zoomIn(); });
+  document.getElementById('zoom-out').addEventListener('click', function(){ homeMap.zoomOut(); });
+
+  document.getElementById('footer-stats').innerHTML =
+    'Réseau mauricien · '+(DATA.busStops.length+DATA.metroStations.length)+' arrêts &amp; stations chargés<br>455+ tronçons issus du catalogue officiel NLTA · SegaMap v1.2';
+
+  // ================= Geolocation ("Ma position") =================
+  var GEO_NODE_ID = 'geo:Ma position';
+  var geoMarkerHome = null, geoAccuracyCircle = null, geoReady = false, geoBusy = false;
+  var geoStatus = document.getElementById('geo-status');
+  var locateBtn = document.getElementById('locate-btn');
+  var originRow = document.getElementById('origin-input').closest('.field-row');
+
+  function setGeoStatus(message, kind){
+    geoStatus.textContent = message || '';
+    geoStatus.className = 'geo-status' + (message ? ' show' : '') + (kind ? ' '+kind : '');
+  }
+
+  function placeGeoMarker(map, lat, lon, accuracy){
+    if(geoAccuracyCircle) map.removeLayer(geoAccuracyCircle);
+    if(geoMarkerHome) map.removeLayer(geoMarkerHome);
+
+    geoAccuracyCircle = L.circle([lat,lon], {
+      radius: Math.min(Math.max(accuracy || 80, 40), 500),
+      color:'#3B6FE0', weight:1, fillColor:'#3B6FE0', fillOpacity:0.12
+    }).addTo(map);
+
+    geoMarkerHome = L.circleMarker([lat,lon], {
+      radius:8, color:'#fff', weight:3, fillColor:'#3B6FE0', fillOpacity:1
+    }).addTo(map);
+
+    return geoMarkerHome;
+  }
+
+  function useGeoAsOrigin(){
+    var input = document.getElementById('origin-input');
+    input.value = 'Ma position';
+    input.dataset.selectedId = GEO_NODE_ID;
+    originRow.classList.add('geo-selected');
+  }
+
+  function setupGeolocation(recenter){
+    if(geoBusy) return;
+
+    if(!window.isSecureContext){
+      setGeoStatus('La localisation nécessite HTTPS (ou localhost).', 'error');
+      return;
+    }
+    if(!navigator.geolocation){
+      setGeoStatus('La localisation n’est pas disponible sur cet appareil.', 'error');
+      return;
+    }
+
+    geoBusy = true;
+    locateBtn.classList.add('is-loading');
+    setGeoStatus('Localisation en cours…');
+
+    navigator.geolocation.getCurrentPosition(function(pos){
+      var lat = pos.coords.latitude, lon = pos.coords.longitude;
+      var accuracy = pos.coords.accuracy || 100;
+
+      addNode(GEO_NODE_ID, 'Ma position', 'geo', 'Localisation actuelle', lat, lon);
+      nodes[GEO_NODE_ID].accuracy = accuracy;
+
+      // Rebuild only the temporary GPS connections so route calculations use
+      // the newest position rather than a stale fix.
+      adj[GEO_NODE_ID] = [];
+      connectExtraNode(GEO_NODE_ID, lat, lon, Math.max(1600, accuracy * 3));
+
+      geoReady = true;
+      if(allNodesList.indexOf(nodes[GEO_NODE_ID]) === -1) allNodesList.unshift(nodes[GEO_NODE_ID]);
+
+      useGeoAsOrigin();
+      placeGeoMarker(homeMap, lat, lon, accuracy);
+
+      if(recenter) homeMap.setView([lat, lon], 16);
+      setGeoStatus('Position trouvée · précision ~'+Math.round(accuracy)+' m', 'ok');
+
+      geoBusy = false;
+      locateBtn.classList.remove('is-loading');
+      setTimeout(function(){ setGeoStatus(''); }, 3500);
+    }, function(err){
+      var message = 'Impossible d’obtenir votre position.';
+      if(err && err.code === 1) message = 'Localisation refusée. Autorisez la position pour SegaMap.';
+      else if(err && err.code === 2) message = 'Position indisponible. Vérifiez le GPS et réessayez.';
+      else if(err && err.code === 3) message = 'La localisation a pris trop de temps. Réessayez.';
+
+      setGeoStatus(message, 'error');
+      geoBusy = false;
+      locateBtn.classList.remove('is-loading');
+    }, {
+      enableHighAccuracy:true,
+      timeout:12000,
+      maximumAge:30000
+    });
+  }
+
+  document.getElementById('locate-btn').addEventListener('click', function(){ setupGeolocation(true); });
+  document.getElementById('use-position-btn').addEventListener('click', function(){ setupGeolocation(false); });
+
+  // ================= Search / autocomplete =================
+  var allNodesList = Object.keys(nodes).map(function(id){return nodes[id];});
+  var geocodeCache = {};
+  var geocodeTimer = null;
+  var geocodeRequest = 0;
+
+  function searchNodes(query){
+    query = query.trim().toLowerCase();
+    if(!query) return [];
+    var starts=[], contains=[];
+    allNodesList.forEach(function(n){
+      var name = n.name.toLowerCase();
+      var area = (n.area || '').toLowerCase();
+      if(name.indexOf(query)===0 || area.indexOf(query)===0) starts.push(n);
+      else if(name.indexOf(query)!==-1 || area.indexOf(query)!==-1) contains.push(n);
+    });
+    return starts.concat(contains).slice(0,6);
+  }
+
+  function searchPlacesOnline(query){
+    var clean = query.trim();
+    if(clean.length < 3) return Promise.resolve([]);
+    var key = clean.toLowerCase();
+    if(geocodeCache[key]) return Promise.resolve(geocodeCache[key]);
+
+    var url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=mu&addressdetails=1&q=' + encodeURIComponent(clean);
+    return fetch(url, {headers:{'Accept':'application/json'}})
+      .then(function(r){ return r.ok ? r.json() : []; })
+      .then(function(items){
+        var results = items.map(function(item, i){
+          var id = 'geo:search:'+key+':'+i;
+          var area = item.display_name || 'Maurice';
+          addNode(id, item.display_name, 'poi', area, Number(item.lat), Number(item.lon));
+          nodes[id].onlineSearch = true;
+          return nodes[id];
+        });
+        geocodeCache[key] = results;
+        results.forEach(function(n){ if(allNodesList.indexOf(n)===-1) allNodesList.push(n); });
+        return results;
+      })
+      .catch(function(){ return []; });
+  }
+
+  function combinedSearch(query){
+    var local = searchNodes(query);
+    if(local.length >= 6 || query.trim().length < 3) return Promise.resolve(local);
+    return searchPlacesOnline(query).then(function(remote){
+      var seen = {};
+      var merged = [];
+      local.concat(remote).forEach(function(n){
+        if(!seen[n.id]){ seen[n.id]=true; merged.push(n); }
+      });
+      return merged.slice(0,8);
+    });
+  }
+  function setupField(inputId, suggId){
+    var input = document.getElementById(inputId);
+    var sugg = document.getElementById(suggId);
+    input.addEventListener('input', function(){
+      input.dataset.selectedId = '';
+      originRow.classList.toggle('geo-selected', input.id === 'origin-input' && input.value === 'Ma position');
+      var q = input.value;
+      clearTimeout(geocodeTimer);
+      if(!q.trim()){ sugg.classList.remove('open'); sugg.innerHTML=''; return; }
+      renderSugg(searchNodes(q), true);
+      geocodeTimer = setTimeout(function(){
+        var request = ++geocodeRequest;
+        combinedSearch(q).then(function(results){
+          if(request === geocodeRequest && input.value.trim() === q.trim()) renderSugg(results, false);
+        });
+      }, 250);
+    });
+    input.addEventListener('focus', function(){
+      if(input.value.trim()) renderSugg(searchNodes(input.value), true);
+    });
+    if(input.id === 'origin-input'){
+      input.addEventListener('blur', function(){
+        if(input.value.trim() !== 'Ma position') originRow.classList.remove('geo-selected');
+      });
+    }
+    document.addEventListener('click', function(ev){
+      if(!sugg.contains(ev.target) && ev.target !== input) sugg.classList.remove('open');
+    });
+    function renderSugg(results, localOnly){
+      if(!results.length){
+        if(localOnly){
+          sugg.innerHTML = '<div class="sugg-item" style="cursor:default;color:#9AA3AD;">Recherche de lieux…</div>';
+          sugg.classList.add('open');
+        } else {
+          sugg.classList.remove('open'); sugg.innerHTML='';
+        }
+        return;
+      }
+      sugg.innerHTML = results.map(function(n){
+        var tag = n.type==='metro' ? '<span class="tag-metro">METRO</span> ' :
+                  (n.type==='poi' ? '<span class="tag-poi">LIEU</span> ' :
+                  (n.type==='geo' ? '<span class="tag-poi">POSITION</span> ' : ''));
+        return '<div class="sugg-item" data-id="'+n.id+'"><span class="sugg-name">'+tag+escapeHtml(n.name)+'</span><span class="sugg-meta">'+escapeHtml(n.area)+'</span></div>';
+      }).join('');
+      sugg.classList.add('open');
+      Array.prototype.forEach.call(sugg.querySelectorAll('.sugg-item'), function(el){
+        el.addEventListener('click', function(){
+          var id = el.dataset.id;
+          input.value = nodes[id].name;
+          input.dataset.selectedId = id;
+          if(input.id === 'origin-input' && id === GEO_NODE_ID) originRow.classList.add('geo-selected');
+          else if(input.id === 'origin-input') originRow.classList.remove('geo-selected');
+          sugg.classList.remove('open');
+          // Move the map to a searched place, giving immediate visual feedback.
+          if(nodes[id] && nodes[id].lat && nodes[id].lon) homeMap.setView([nodes[id].lat, nodes[id].lon], 16);
+        });
+      });
+    }
+    return input;
+  }
+  var originInput = setupField('origin-input','origin-sugg');
+  var destInput = setupField('dest-input','dest-sugg');
+  setupGeolocation(true);
+
+  destInput.addEventListener('keydown', function(ev){
+    if(ev.key === 'Enter'){
+      ev.preventDefault();
+      document.getElementById('go-btn').click();
+    }
+  });
+
+  document.getElementById('swap-btn').addEventListener('click', function(){
+    var ov=originInput.value, oid=originInput.dataset.selectedId;
+    var dv=destInput.value, did=destInput.dataset.selectedId;
+    originInput.value=dv; originInput.dataset.selectedId=did||'';
+    destInput.value=ov; destInput.dataset.selectedId=oid||'';
+  });
+
+  // ================= Trip state =================
+  var trip = null; // {oid, did, routed, legs}
+
+  document.getElementById('go-btn').addEventListener('click', function(){
+    var oid = originInput.dataset.selectedId;
+    var did = destInput.dataset.selectedId;
+    if(!oid){ var m=allNodesList.find(function(n){return n.name.toLowerCase()===originInput.value.trim().toLowerCase();}); if(m) oid=m.id; }
+    if(!did){ var m2=allNodesList.find(function(n){return n.name.toLowerCase()===destInput.value.trim().toLowerCase();}); if(m2) did=m2.id; }
+    if(!oid || !did){ alert('Choisis un départ et une arrivée dans les suggestions.'); return; }
+    if(oid === did){ alert('Le départ et l\u2019arrivée sont identiques.'); return; }
+
+    var routed = routeWithFallback(oid, did);
+    if(!routed){
+      alert('Aucun itinéraire trouvé, même en cherchant depuis les arrêts voisins.');
+      return;
+    }
+    var startId = routed.actualStart, destId = routed.actualEnd;
+    var legs = buildLegs(startId, routed.result);
+    if(routed.startWalk > 0) legs.unshift({mode:'walk', line:null, mk:'walk', from:oid, to:startId, rideMin:routed.startWalk, waitMin:0, stops:1, isFallback:true});
+    if(routed.endWalk > 0) legs.push({mode:'walk', line:null, mk:'walk', from:destId, to:did, rideMin:routed.endWalk, waitMin:0, stops:1, isFallback:true});
+
+    // Insert synthetic "correspondance" markers between two consecutive non-walk legs
+    var displaySteps = [];
+    legs.forEach(function(l, idx){
+      displaySteps.push(l);
+      var next = legs[idx+1];
+      if(next && l.mode !== 'walk' && next.mode !== 'walk' && l.to === next.from){
+        displaySteps.push({isTransfer:true, at:l.to, waitMin: next.waitMin});
+      }
+    });
+
+    trip = {oid:oid, did:did, routed:routed, legs:legs, displaySteps:displaySteps};
+    renderOverview();
+    showScreen('overview');
+  });
+
+  // ================= Overview rendering =================
+  var overviewMap = null, overviewLegLayers = [];
+
+  function renderOverview(){
+    var oid=trip.oid, did=trip.did, legs=trip.legs, routed=trip.routed;
+    var origin=nodes[oid], dest=nodes[did];
+
+    document.getElementById('ov-title').textContent = origin.name+' → '+dest.name;
+
+    // Fallback banners
+    var fb = document.getElementById('fallback-banners');
+    fb.innerHTML = '';
+    if(routed.startWalk > 0){
+      fb.innerHTML += '<div class="fallback-banner">'+ICONS.warn+
+        '<span>« '+escapeHtml(nodes[oid].name)+' » n\u2019a pas de ligne documentée. Itinéraire calculé depuis <strong>'+escapeHtml(nodes[routed.actualStart].name)+'</strong>, à '+fmtMin(routed.startWalk)+' à pied.</span></div>';
+    }
+    if(routed.endWalk > 0){
+      fb.innerHTML += '<div class="fallback-banner">'+ICONS.warn+
+        '<span>« '+escapeHtml(nodes[did].name)+' » n\u2019a pas de ligne documentée. Itinéraire calculé jusqu\u2019à <strong>'+escapeHtml(nodes[routed.actualEnd].name)+'</strong>, à '+fmtMin(routed.endWalk)+' de votre arrivée.</span></div>';
+    }
+
+    // Icon summary row
+    var walkTotal=0, busTotal=0, metroTotal=0, waitTotal=0;
+    legs.forEach(function(l){
+      waitTotal += l.waitMin;
+      if(l.mode==='walk') walkTotal+=l.rideMin; else if(l.mode==='bus') busTotal+=l.rideMin; else if(l.mode==='metro') metroTotal+=l.rideMin;
+    });
+    var total = walkTotal+busTotal+metroTotal+waitTotal;
+
+    var row = document.getElementById('icon-summary-row');
+    var rowHtml = '';
+    legs.forEach(function(l, idx){
+      var color = legColor(idx);
+      rowHtml += '<div class="is-item"><div class="is-circle" style="background:'+color+'">'+ICONS[l.mode]+'</div><div class="is-value">'+(l.mode==='walk'?fmtMin(l.rideMin):(l.line||'M'))+'</div></div>';
+      if(idx < legs.length-1) rowHtml += '<div class="is-arrow">›</div>';
+    });
+    rowHtml += '<div class="is-total">≈ '+fmtMin(total)+'</div>';
+    row.innerHTML = rowHtml;
+
+    // Steps list
+    var stepsList = document.getElementById('steps-list');
+    var html = '';
+    html += stepCardPin(origin.name, origin.area);
+    var legIdx = 0;
+    trip.displaySteps.forEach(function(item){
+      if(item.isTransfer){
+        html += stepCardTransfer(nodes[item.at].name, item.waitMin);
+      } else {
+        html += stepCardLeg(item, legIdx, legColor(legIdx));
+        legIdx++;
+      }
+    });
+    html += stepCardPin(dest.name, dest.area);
+    stepsList.innerHTML = html;
+
+    // wire clicks
+    Array.prototype.forEach.call(stepsList.querySelectorAll('.step-card[data-leg]'), function(el){
+      el.addEventListener('click', function(){
+        openDetail(parseInt(el.dataset.leg, 10));
+      });
+    });
+
+    renderOverviewMap();
+  }
+
+  function stepCardPin(name, area){
+    return '<div class="step-card pin-card"><div class="step-icon" style="background:var(--navy)">'+ICONS.pin+'</div>'+
+      '<div class="step-body"><p class="step-title">'+escapeHtml(name)+'</p><p class="step-route">'+escapeHtml(area)+'</p></div></div>';
+  }
+  function stepCardTransfer(atName, waitMin){
+    return '<div class="step-card" style="background:none;cursor:default;">'+
+      '<div class="step-icon" style="background:#B9BFC8">'+ICONS.transfer+'</div>'+
+      '<div class="step-body"><p class="step-title">Correspondance</p>'+
+      '<p class="step-route">'+escapeHtml(atName)+'</p>'+
+      '<p class="step-meta">Temps d\u2019attente estimé : ~'+Math.round(waitMin)+' min</p></div></div>';
+  }
+  function stepCardLeg(l, legIdx, color){
+    var title, route, meta;
+    if(l.mode === 'walk'){
+      title = 'Marcher jusqu\u2019à l\u2019arrêt';
+      route = escapeHtml(nodes[l.from].name)+' → '+escapeHtml(nodes[l.to].name);
+      meta = fmtMin(l.rideMin)+(l.isFallback ? ' · arrêt le plus proche connecté' : ' à pied');
+    } else if(l.mode === 'bus'){
+      title = 'Ligne '+escapeHtml(l.line);
+      route = escapeHtml(nodes[l.from].name)+' → '+escapeHtml(nodes[l.to].name);
+      meta = (l.stops>1?(l.stops+' tronçons · '):'')+'~'+fmtMin(l.rideMin);
+    } else {
+      title = 'Metro Express';
+      route = escapeHtml(nodes[l.from].name)+' → '+escapeHtml(nodes[l.to].name);
+      meta = (l.stops>1?(l.stops+' arrêts · '):'1 arrêt · ')+'~'+fmtMin(l.rideMin);
+    }
+    return '<div class="step-card" data-leg="'+legIdx+'">'+
+      '<div class="step-icon" style="background:'+color+'">'+ICONS[l.mode]+'</div>'+
+      '<div class="step-body"><p class="step-title">'+title+'</p><p class="step-route">'+route+'</p><p class="step-meta">'+meta+'</p></div>'+
+      '<div class="step-chevron">'+ICONS.chevron+'</div></div>';
+  }
+
+  function nodeLatLng(id){ var n=nodes[id]; return [n.lat, n.lon]; }
+
+  // ================= Real street-following geometry (progressive enhancement) =================
+  // Straight/metro-sequence lines render immediately; if a live routing service answers,
+  // the segment is swapped for the real walked/driven street path.
+  var roadRouteCache = {};
+  function fetchRoadRoute(fromId, toId, profile){
+    var key = profile+'|'+fromId+'|'+toId;
+    if(roadRouteCache[key]) return roadRouteCache[key];
+    var a = nodes[fromId], b = nodes[toId];
+    var url = 'https://router.project-osrm.org/route/v1/'+profile+'/'+a.lon+','+a.lat+';'+b.lon+','+b.lat+'?overview=full&geometries=geojson';
+    var p = fetch(url).then(function(r){ return r.ok ? r.json() : null; }).then(function(data){
+      if(data && data.routes && data.routes[0]){
+        return data.routes[0].geometry.coordinates.map(function(c){ return [c[1], c[0]]; });
+      }
+      return null;
+    }).catch(function(){ return null; });
+    roadRouteCache[key] = p;
+    return p;
+  }
+  // Only walk and bus legs benefit (metro follows a fixed rail alignment already drawn
+  // through its real stations; a road profile would be misleading for it).
+  function enhanceLegWithRoadRoute(leg, polylineLayer, map, onUpdate){
+    if(leg.mode !== 'walk' && leg.mode !== 'bus') return;
+    var profile = leg.mode === 'walk' ? 'foot' : 'driving';
+    fetchRoadRoute(leg.from, leg.to, profile).then(function(pts){
+      if(!pts || pts.length < 2) return;
+      polylineLayer.setLatLngs(pts);
+      if(onUpdate) onUpdate(pts);
+    });
+  }
+
+
+  function renderOverviewMap(){
+    var el = document.getElementById('overview-map');
+    if(overviewMap){ overviewMap.remove(); overviewMap=null; }
+    overviewMap = L.map(el, {scrollWheelZoom:false, attributionControl:false});
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {maxZoom:19, detectRetina:true}).addTo(overviewMap);
+
+    var allPts = [];
+    overviewLegLayers = [];
+    trip.legs.forEach(function(l, idx){
+      var latlngs = legPolylinePoints(l);
+      var dash = l.mode==='walk' ? '2,8' : null;
+      var line = L.polyline(latlngs, {color: legColor(idx), weight: l.mode==='walk'?4:5, opacity:0.92, dashArray:dash, lineCap:'round'}).addTo(overviewMap);
+      overviewLegLayers.push(line);
+      latlngs.forEach(function(p){allPts.push(p);});
+      enhanceLegWithRoadRoute(l, line, overviewMap);
+    });
+    L.circleMarker(nodeLatLng(trip.oid), {radius:8, color:'#15181D', weight:2.5, fillColor:'#E24C4B', fillOpacity:1}).addTo(overviewMap);
+    L.circleMarker(nodeLatLng(trip.did), {radius:8, color:'#15181D', weight:2.5, fillColor:'#3B6FE0', fillOpacity:1}).addTo(overviewMap);
+    trip.legs.forEach(function(l, idx){
+      if(idx < trip.legs.length-1){
+        L.circleMarker(nodeLatLng(l.to), {radius:5, color: legColor(idx+1), weight:2, fillColor:'#fff', fillOpacity:1}).addTo(overviewMap);
+      }
+    });
+    if(trip.oid === GEO_NODE_ID && geoReady){
+      var gn = nodes[GEO_NODE_ID];
+      placeGeoMarker(overviewMap, gn.lat, gn.lon, gn.accuracy || 100);
+    }
+    allPts.push(nodeLatLng(trip.oid), nodeLatLng(trip.did));
+    if(allPts.length) overviewMap.fitBounds(allPts, {padding:[24,24]});
+
+    document.getElementById('recenter-btn').onclick = function(){
+      if(allPts.length) overviewMap.fitBounds(allPts, {padding:[24,24]});
+    };
+  }
+
+  function legPolylinePoints(l){
+    if(l.mode === 'metro'){
+      var order = metroSorted.map(function(s){return 'metro:'+s.name;});
+      var ia = order.indexOf(l.from), ib = order.indexOf(l.to);
+      if(ia>-1 && ib>-1){
+        var lo=Math.min(ia,ib), hi=Math.max(ia,ib);
+        var slice = order.slice(lo, hi+1);
+        if(ia>ib) slice.reverse();
+        return slice.map(nodeLatLng);
+      }
+    }
+    return [nodeLatLng(l.from), nodeLatLng(l.to)];
+  }
+
+  // ================= Detail screen =================
+  var detailMap = null;
+
+  function linesServedAt(nodeId){
+    var lines = [];
+    (DATA.busLines||[]).forEach(function(e){
+      if(e.a === nodeId || e.b === nodeId){ if(lines.indexOf(e.line) === -1) lines.push(e.line); }
+    });
+    return lines;
+  }
+
+  function openDetail(legIdx){
+    var l = trip.legs[legIdx];
+    var color = legColor(legIdx);
+    var titleEl = document.getElementById('detail-title');
+    var subEl = document.getElementById('detail-subtitle');
+    var statsEl = document.getElementById('detail-stats');
+    var calloutEl = document.getElementById('detail-callout');
+    var calloutNameEl = document.getElementById('detail-callout-name');
+    var instrEl = document.getElementById('detail-instr');
+    var linesEl = document.getElementById('detail-lines');
+    var linesChipsEl = document.getElementById('detail-lines-chips');
+
+    if(l.mode === 'walk'){
+      var distM = (l.rideMin * WALK_SPEED_M_MIN) / DETOUR_FACTOR;
+      titleEl.textContent = 'Marcher jusqu\u2019à l\u2019arrêt';
+      subEl.textContent = nodes[l.from].name+' → '+nodes[l.to].name;
+      statsEl.innerHTML =
+        statChip(ICONS.clock, fmtMin(l.rideMin)) +
+        statChip(ICONS.ruler, fmtDist(distM)) +
+        statChip(ICONS.gauge, walkDifficulty(distM));
+      calloutEl.style.display = 'block';
+      calloutNameEl.textContent = nodes[l.to].name;
+      var dir = bearingDirection(nodes[l.from].lat, nodes[l.from].lon, nodes[l.to].lat, nodes[l.to].lon);
+      instrEl.textContent = 'Marchez en direction du '+dir+' jusqu\u2019à '+(nodes[l.to].type==='metro'?'la station':'l\u2019arrêt')+' '+nodes[l.to].name+'.'+
+        (l.isFallback ? ' Cet arrêt n\u2019a pas de correspondance directe documentée depuis votre point de départ exact — c\u2019est le point connecté le plus proche.' : '');
+      var lines = nodes[l.to].type === 'metro' ? ['Metro Express'] : linesServedAt(l.to);
+      if(lines.length){
+        linesEl.style.display = 'block';
+        linesChipsEl.innerHTML = lines.map(function(ln){return '<span class="line-chip-badge">'+escapeHtml(ln)+'</span>';}).join('');
+      } else {
+        linesEl.style.display = 'none';
+      }
+    } else if(l.mode === 'bus'){
+      titleEl.textContent = 'Ligne '+l.line;
+      subEl.textContent = nodes[l.from].name+' → '+nodes[l.to].name;
+      statsEl.innerHTML =
+        statChip(ICONS.clock, '~'+fmtMin(l.rideMin)) +
+        statChip(ICONS.transfer, 'Attente ~'+Math.round(l.waitMin)+' min') +
+        statChip(ICONS.bus, (l.stops>1?l.stops+' tronçons':'direct'));
+      calloutEl.style.display = 'none';
+      instrEl.textContent = 'Prenez le bus de la ligne '+l.line+' à '+nodes[l.from].name+' en direction de '+nodes[l.to].name+'. Trajet estimé à partir de la distance réelle du tracé officiel NLTA — sans horaire garanti.';
+      linesEl.style.display = 'none';
+    } else {
+      titleEl.textContent = 'Metro Express';
+      subEl.textContent = nodes[l.from].name+' → '+nodes[l.to].name;
+      statsEl.innerHTML =
+        statChip(ICONS.clock, '~'+fmtMin(l.rideMin)) +
+        statChip(ICONS.transfer, 'Attente ~'+Math.round(l.waitMin)+' min') +
+        statChip(ICONS.metro, (l.stops>1?l.stops+' arrêts':'1 arrêt'));
+      calloutEl.style.display = 'none';
+      instrEl.textContent = 'Prenez le Metro Express à '+nodes[l.from].name+' en direction de '+nodes[l.to].name+'.';
+      linesEl.style.display = 'none';
+    }
+
+    showScreen('detail');
+    renderDetailMap(l, color);
+  }
+
+  function statChip(icon, label){
+    return '<div class="stat-chip">'+icon+'<span>'+label+'</span></div>';
+  }
+
+  function renderDetailMap(l, color){
+    var el = document.getElementById('detail-map');
+    if(detailMap){ detailMap.remove(); detailMap=null; }
+    detailMap = L.map(el, {scrollWheelZoom:false, attributionControl:false});
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {maxZoom:19, detectRetina:true}).addTo(detailMap);
+    var latlngs = legPolylinePoints(l);
+    var dash = l.mode==='walk' ? '4,10' : null;
+    var poly = L.polyline(latlngs, {color:color, weight: l.mode==='walk'?4.5:5.5, opacity:0.95, dashArray:dash, lineCap:'round'}).addTo(detailMap);
+    L.circleMarker(nodeLatLng(l.from), {radius:7, color:'#15181D', weight:2, fillColor:'#fff', fillOpacity:1}).addTo(detailMap);
+    L.circleMarker(nodeLatLng(l.to), {radius:7, color:'#15181D', weight:2, fillColor:color, fillOpacity:1}).addTo(detailMap);
+    detailMap.fitBounds(latlngs, {padding:[36,36]});
+    enhanceLegWithRoadRoute(l, poly, detailMap, function(pts){
+      detailMap.fitBounds(pts, {padding:[36,36]});
+    });
+  }
+
+})();
+
+</script>
+</body>
+</html>
