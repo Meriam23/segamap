@@ -23,15 +23,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Prepare SegaMap v2.2
+      - name: Prepare SegaMap v3.0
         run: |
-          perl -0pi -e 's/SegaMap v1\.2/SegaMap v2.2/g; s/SegaMap v1\.3/SegaMap v2.2/g; s/SegaMap v1\.4/SegaMap v2.2/g; s/SegaMap v1\.5/SegaMap v2.2/g; s/SegaMap v1\.6/SegaMap v2.2/g; s/SegaMap v1\.7/SegaMap v2.2/g; s/SegaMap v1\.8/SegaMap v2.2/g; s/SegaMap v2\.0/SegaMap v2.2/g; s/SegaMap v2\.1/SegaMap v2.2/g; s/tronçons/arrêts/g; s/tronçon/arrêt/g' index.html
+          perl -0pi -e 's/SegaMap v1\.2/SegaMap v3.0/g; s/SegaMap v1\.3/SegaMap v3.0/g; s/SegaMap v1\.4/SegaMap v3.0/g; s/SegaMap v1\.5/SegaMap v3.0/g; s/SegaMap v1\.6/SegaMap v3.0/g; s/SegaMap v1\.7/SegaMap v3.0/g; s/SegaMap v1\.8/SegaMap v3.0/g; s/SegaMap v2\.0/SegaMap v3.0/g; s/SegaMap v2\.1/SegaMap v3.0/g; s/SegaMap v2\.2/SegaMap v3.0/g; s/tronçons/arrêts/g; s/tronçon/arrêt/g' index.html
           perl -0pi -e 's/var WAIT_BUS = 8, WAIT_METRO = 5;/var WAIT_BUS = 10, WAIT_METRO = 5;/g; s/var WALK_SPEED_M_MIN = 83\.3, DETOUR_FACTOR = 1\.3;/var WALK_SPEED_M_MIN = 83.3, DETOUR_FACTOR = 1.45;/g' index.html
       - name: Add Cascavelle routing module
         run: perl -0pi -e 's#(<script>\n\(function\(\)\{)#<script src="cascavelle-fix.js"></script>\n$1#' index.html
       - name: Add stable UI and routing modules
-        run: perl -0pi -e 's#</body>#<script src="search-ux.js"></script>\n<script src="route-network-fix.js"></script>\n<script src="search-cleanup.js"></script>\n<script src="v22-search.js"></script>\n</body>#' index.html
-      - name: Inject v2.0 UI and v2.1 destination wording
+        run: perl -0pi -e 's#</body>#<script src="search-ux.js"></script>\n<script src="route-network-fix.js"></script>\n<script src="search-cleanup.js"></script>\n<script src="v22-search.js"></script>\n<script src="v30-cleanup.js"></script>\n</body>#' index.html
+      - name: Inject route options and inline step details
         shell: python
         run: |
           from pathlib import Path
@@ -42,17 +42,17 @@ jobs:
               raise SystemExit('Could not find main application script')
           html = html[:pos] + '\n' + patch + html[pos:]
           Path('index.html').write_text(html, encoding='utf-8')
-      - name: Verify v2.2 changes
+      - name: Verify v3.0 changes
         run: |
-          grep -q 'SegaMap v2.2' index.html
+          grep -q 'SegaMap v3.0' index.html
           test -s cascavelle-fix.js
           test -s route-network-fix.js
           test -s v18-route-options.js
           test -s v20-ui.js
           test -s v21-ui.js
           test -s v22-search.js
-          grep -q 'route-options-overlay' index.html
-          grep -q 'v20-inline-detail' index.html
+          test -s v30-cleanup.js
+          grep -q 'v30-cleanup.js' index.html
           grep -q 'v22-search.js' index.html
       - name: Setup Pages
         uses: actions/configure-pages@v4
