@@ -30,7 +30,7 @@ jobs:
       - name: Add Cascavelle routing module
         run: perl -0pi -e 's#(<script>\n\(function\(\)\{)#<script src="cascavelle-fix.js"></script>\n$1#' index.html
       - name: Add stable UI and routing modules
-        run: perl -0pi -e 's#</body>#<script src="search-ux.js"></script>\n<script src="route-network-fix.js"></script>\n<script src="search-cleanup.js"></script>\n<script src="v22-search.js"></script>\n<script src="v30-cleanup.js"></script>\n<script src="v30-map-location.js"></script>\n<script src="v30-search-selection.js"></script>\n</body>#' index.html
+        run: perl -0pi -e 's#</body>#<script src="search-ux.js"></script>\n<script src="route-network-fix.js"></script>\n<script src="search-cleanup.js"></script>\n<script src="v22-search.js"></script>\n<script src="v30-cleanup.js"></script>\n<script src="v30-map-location.js"></script>\n<script src="v30-search-selection.js"></script>\n<script src="v31-search-autocomplete.js"></script>\n</body>#' index.html
       - name: Inject route options and inline step details
         shell: python
         run: |
@@ -54,9 +54,10 @@ jobs:
           test -s v30-cleanup.js
           test -s v30-map-location.js
           test -s v30-search-selection.js
+          test -s v31-search-autocomplete.js
           grep -q 'v30-cleanup.js' index.html
           grep -q 'v22-search.js' index.html
-          grep -q 'v30-map-location.js' index.html
+          grep -q 'v31-search-autocomplete.js' index.html
           grep -q 'v30-search-selection.js' index.html
       - name: Setup Pages
         uses: actions/configure-pages@v4
