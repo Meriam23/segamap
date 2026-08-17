@@ -1,6 +1,8 @@
 /* SegaMap — route network reinforcement
-   Uses route/terminus information verified against Mauritius-Buses.com.
-   Safe overlay on the existing graph; no timetable data is imported.
+   Cascavelle stop fix: the official NLTA timetable lists "Cascavelle"
+   as the fare-stage/stop for route 57A. Do not require a fictional
+   "Cascavelle Bus Terminal" node name.
+   No timetable data is imported.
 */
 (function(){
   'use strict';
@@ -26,10 +28,13 @@
     return true;
   }
 
-  // Verified public route catalogue entries.
-  addLine('57A',[/Quatre Bornes.*Traffic Centre/i,/Quatre Bornes.*Traffic/i],[/Cascavelle Bus Terminal/i,/Gare bus Cascavelle/i,/Cascavelle.*multi-lignes/i],30);
+  // Official NLTA route 57A: Quatre Bornes -> La Louise -> Palma -> Beaux Songes -> Cascavelle.
+  // Mauritius-Buses.com also lists Cascavelle as the route 57A endpoint.
+  var cascavelleStop=[/Cascavelle$/i,/^Cascavelle$/i,/Cascavelle(?!.*Shopping)/i,/Cascavelle Village/i];
+
+  addLine('57A',[/Quatre Bornes.*Traffic Centre/i,/Quatre Bornes.*Traffic/i],cascavelleStop,30);
   addLine('57',[/Quatre Bornes.*Traffic Centre/i,/Quatre Bornes.*Traffic/i],[/Wolmar Traffic Centre/i,/Flic en Flac Bus Terminus/i],45);
-  addLine('69',[/Place Victoria Bus Terminal/i,/Port Louis Victoria/i,/Victoria Square/i],[/Cascavelle Bus Terminal/i,/Gare bus Cascavelle/i,/Cascavelle.*multi-lignes/i],50);
+  addLine('69',[/Place Victoria Bus Terminal/i,/Port Louis Victoria/i,/Victoria Square/i],cascavelleStop,50);
   addLine('123',[/Place Victoria Bus Terminal/i,/Port Louis Victoria/i,/Victoria Square/i],[/Wolmar Traffic Centre/i,/Flic en Flac Bus Terminus/i],60);
   addLine('179',[/Curepipe.*Ian Palach North/i,/Curepipe/i],[/Wolmar Traffic Centre/i,/Flic en Flac Bus Terminus/i],70);
   addLine('189',[/Rose Hill.*Place/i,/Rose Hill/i],[/Wolmar Traffic Centre/i,/Flic en Flac Bus Terminus/i],60);
