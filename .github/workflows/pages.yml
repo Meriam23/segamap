@@ -30,6 +30,9 @@ jobs:
       - name: Add Mauritius street and place search
         run: perl -0pi -e 's#</body>#<script src="search-mauritius.js"></script>\n</body>#' index.html
 
+      - name: Add mobile search UX
+        run: perl -0pi -e 's#</body>#<script src="search-ux.js"></script>\n</body>#' index.html
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
