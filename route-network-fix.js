@@ -1,6 +1,6 @@
 /* SegaMap — route network reinforcement
    Uses route/terminus information verified against Mauritius-Buses.com.
-   This is deliberately a small, safe patch layered over the existing graph.
+   Safe overlay on the existing graph; no timetable data is imported.
 */
 (function(){
   'use strict';
@@ -26,20 +26,16 @@
     return true;
   }
 
-  /* Verified route endpoints from the public Mauritius-Buses catalogue:
-     57: Quatre Bornes -> Wolmar
-     57A: Cascavelle -> Quatre Bornes
-     69: Port Louis -> Cascavelle Village
-     123: Port Louis -> Wolmar
-     179: Curepipe -> Wolmar
-     189: Rose Hill -> Wolmar
-     These connections are used only to restore missing direct-line choices;
-     the existing detailed graph remains in place for intermediate routing.
-  */
+  // Verified public route catalogue entries.
   addLine('57A',[/Quatre Bornes.*Traffic Centre/i,/Quatre Bornes.*Traffic/i],[/Cascavelle Bus Terminal/i,/Gare bus Cascavelle/i,/Cascavelle.*multi-lignes/i],30);
   addLine('57',[/Quatre Bornes.*Traffic Centre/i,/Quatre Bornes.*Traffic/i],[/Wolmar Traffic Centre/i,/Flic en Flac Bus Terminus/i],45);
   addLine('69',[/Place Victoria Bus Terminal/i,/Port Louis Victoria/i,/Victoria Square/i],[/Cascavelle Bus Terminal/i,/Gare bus Cascavelle/i,/Cascavelle.*multi-lignes/i],50);
   addLine('123',[/Place Victoria Bus Terminal/i,/Port Louis Victoria/i,/Victoria Square/i],[/Wolmar Traffic Centre/i,/Flic en Flac Bus Terminus/i],60);
   addLine('179',[/Curepipe.*Ian Palach North/i,/Curepipe/i],[/Wolmar Traffic Centre/i,/Flic en Flac Bus Terminus/i],70);
   addLine('189',[/Rose Hill.*Place/i,/Rose Hill/i],[/Wolmar Traffic Centre/i,/Flic en Flac Bus Terminus/i],60);
+  addLine('52',[/Place Victoria Bus Terminal/i,/Port Louis.*Transportation/i,/Port Louis Victoria/i],[/Bambous Bus Terminal/i,/Bambous.*Royal/i],45);
+  addLine('52B',[/Place Victoria Bus Terminal/i,/Port Louis.*Transportation/i,/Port Louis Victoria/i],[/Bambous Bus Terminal/i,/Bambous.*Royal/i],45);
+  addLine('52C',[/Place Victoria Bus Terminal/i,/Port Louis.*Transportation/i,/Port Louis Victoria/i],[/Bambous Bus Terminal/i,/Bambous.*NHDC/i],48);
+  addLine('229',[/Rose Hill.*Dar Es Salaam/i,/Rose Hill.*Place/i,/Rose Hill/i],[/Bambous Bus Terminal/i,/Bambous.*Royal/i],35);
+  addLine('5',[/Quatre Bornes.*Traffic Centre/i,/Quatre Bornes.*Traffic/i],[/Baie du Cap/i],75);
 })();
