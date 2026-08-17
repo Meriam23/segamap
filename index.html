@@ -162,14 +162,15 @@
   .suggestions{
     position:absolute; top:calc(100% + 4px); left:0; right:0;
     background:#fff; border:1px solid var(--line); border-radius:12px;
-    box-shadow:var(--shadow-lg); max-height:240px; overflow-y:auto; z-index:30; display:none;
+    box-shadow:var(--shadow-lg); max-height:min(220px,34vh); overflow-y:auto; overflow-x:hidden;
+    overscroll-behavior:contain; -webkit-overflow-scrolling:touch; z-index:1200; display:none;
   }
   .suggestions.open{display:block;}
-  .sugg-item{padding:10px 14px; cursor:pointer; display:flex; justify-content:space-between; gap:10px; border-bottom:1px solid #F0F1F3;}
+  .sugg-item{min-height:46px; padding:10px 14px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid #F0F1F3;}
   .sugg-item:last-child{border-bottom:none;}
   .sugg-item:hover{background:#F4F5F7;}
-  .sugg-name{font-size:13.5px; font-weight:500;}
-  .sugg-meta{font-size:10.5px; color:#9AA3AD; font-family:'IBM Plex Mono',monospace; white-space:nowrap;}
+  .sugg-name{font-size:13.5px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .sugg-meta{font-size:10.5px; color:#9AA3AD; font-family:'IBM Plex Mono',monospace; white-space:nowrap; flex-shrink:0; max-width:38%; overflow:hidden; text-overflow:ellipsis;}
   .tag-metro{color:var(--blue); font-weight:700;}
   .tag-poi{color:var(--red); font-weight:700;}
 
