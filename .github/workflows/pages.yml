@@ -32,7 +32,7 @@ jobs:
         run: perl -0pi -e 's#(<script>\n\(function\(\)\{)#<script src="cascavelle-fix.js"></script>\n$1#' index.html
 
       - name: Add Mauritius street and place search
-        run: perl -0pi -e 's#</body>#<script src="search-mauritius.js"></script>\n</body>#' index.html
+        run: perl -0pi -e 's#</body>#<script src="search-mauritius.js"></script>\n<script src="search-ux.js"></script>\n<script src="version.js"></script>\n</body>#' index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
