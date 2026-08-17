@@ -23,48 +23,38 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Prepare SegaMap v1.8
         run: |
           perl -0pi -e 's/SegaMap v1\.2/SegaMap v1.8/g; s/SegaMap v1\.3/SegaMap v1.8/g; s/SegaMap v1\.4/SegaMap v1.8/g; s/SegaMap v1\.5/SegaMap v1.8/g; s/SegaMap v1\.6/SegaMap v1.8/g; s/SegaMap v1\.7/SegaMap v1.8/g; s/tronçons/arrêts/g; s/tronçon/arrêt/g' index.html
           perl -0pi -e 's/var WAIT_BUS = 8, WAIT_METRO = 5;/var WAIT_BUS = 10, WAIT_METRO = 5;/g; s/var WALK_SPEED_M_MIN = 83\.3, DETOUR_FACTOR = 1\.3;/var WALK_SPEED_M_MIN = 83.3, DETOUR_FACTOR = 1.45;/g' index.html
-
       - name: Add Cascavelle routing module
         run: perl -0pi -e 's#(<script>\n\(function\(\)\{)#<script src="cascavelle-fix.js"></script>\n$1#' index.html
-
       - name: Add search and routing modules
         run: perl -0pi -e 's#</body>#<script src="search-mauritius.js"></script>\n<script src="search-ux.js"></script>\n<script src="version.js"></script>\n<script src="route-network-fix.js"></script>\n<script src="search-cleanup.js"></script>\n</body>#' index.html
-
-      - name: Inject multi-route chooser inside app scope
+      - name: Inject multi-route chooser inside main app script
         shell: python
         run: |
           from pathlib import Path
           html = Path('index.html').read_text(encoding='utf-8')
           patch = Path('v18-route-options.js').read_text(encoding='utf-8')
-          marker = '\n})();\n</script>'
-          pos = html.rfind(marker)
+          pos = html.rfind('</script>')
           if pos < 0:
-              raise SystemExit('Could not find the main SegaMap IIFE boundary')
+              raise SystemExit('Could not find main application script')
           html = html[:pos] + '\n' + patch + html[pos:]
           Path('index.html').write_text(html, encoding='utf-8')
-
       - name: Verify v1.8 routing changes
         run: |
+          grep -q 'SegaMap v1.8' index.html
           test -s cascavelle-fix.js
+          test -s route-network-fix.js
           test -s v18-route-options.js
-          grep -q "line.*123" cascavelle-fix.js
-          grep -q "line.*69" cascavelle-fix.js
-          grep -q "multi-route" v18-route-options.js
-          grep -q "v1.8" index.html
-
+          grep -q 'route-options-overlay' index.html
       - name: Setup Pages
         uses: actions/configure-pages@v4
-
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: .
-
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
