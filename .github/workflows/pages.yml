@@ -24,14 +24,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Prepare SegaMap v1.3
+        run: |
+          perl -0pi -e 's/SegaMap v1\.2/SegaMap v1.3/g; s/tronçons/arrêts/g; s/tronçon/arrêt/g' index.html
+
       - name: Add Cascavelle routing patch to published app
         run: perl -0pi -e 's#(<script>\n\(function\(\)\{)#<script src="cascavelle-fix.js"></script>\n$1#' index.html
 
       - name: Add Mauritius street and place search
         run: perl -0pi -e 's#</body>#<script src="search-mauritius.js"></script>\n</body>#' index.html
-
-      - name: Add mobile search UX
-        run: perl -0pi -e 's#</body>#<script src="search-ux.js"></script>\n</body>#' index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
