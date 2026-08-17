@@ -24,45 +24,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Apply Cascavelle routing correction
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('index.html')
-          s = p.read_text(encoding='utf-8')
-          marker = "  // ================= Utilities ================="
-          patch = r'''
-  // ================= Cascavelle routing correction v1.2.1 =================
-  // Cascavelle has several mapped stops. Keep them connected so the router
-  // does not invent an unnecessary detour when the user selects the terminal,
-  // the multi-line stop, the Casela stop, or the nearby Cascavelle stop.
-  (function(){
-    var C = {
-      terminal: 'bus:Cascavelle Bus Terminal',
-      multi: 'bus:Bus stop Cascavelle (multi-lignes)',
-      gare: 'bus:Gare bus Cascavelle',
-      casela: 'bus:Casela Bus Stop',
-      beaux: 'bus:Beaux Songes Bus Terminal'
-    };
-    function edgeIf(a,b,mode,line,weight){
-      if(nodes[a] && nodes[b]) addEdge(a,b,mode,line,weight);
-    }
-    // 57A reaches Cascavelle from Beaux Songes; the existing dataset already
-    // contains the 57A segment to the multi-line Cascavelle stop.
-    edgeIf(C.beaux, C.terminal, 'bus', '57A', 8.0);
-    // Short pedestrian links between the nearby Cascavelle stops.
-    edgeIf(C.terminal, C.multi, 'walk', null, 1.4);
-    edgeIf(C.terminal, C.gare, 'walk', null, 1.4);
-    edgeIf(C.multi, C.gare, 'walk', null, 2.8);
-    edgeIf(C.casela, C.terminal, 'walk', null, 2.5);
-    edgeIf(C.casela, C.multi, 'walk', null, 3.2);
-  })();
-'''
-          if marker in s and 'Cascavelle routing correction v1.2.1' not in s:
-              s = s.replace(marker, patch + '\n' + marker, 1)
-              p.write_text(s, encoding='utf-8')
-          PY
+      - name: Add Cascavelle routing patch to published app
+        run: perl -0pi -e 's#(<script>\n\(function\(\)\{)#<script src="cascavelle-fix.js"></script>\n$1#' index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
